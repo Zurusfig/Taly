@@ -24,8 +24,15 @@ function useAuthSession() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 5-second timeout so a bad/missing Supabase URL doesn't leave the app blank.
+    const timeout = setTimeout(() => setLoading(false), 5000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      clearTimeout(timeout);
       setSession(session);
+      setLoading(false);
+    }).catch(() => {
+      clearTimeout(timeout);
       setLoading(false);
     });
 
@@ -33,7 +40,10 @@ function useAuthSession() {
       setSession(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   return { session, loading };
@@ -67,7 +77,7 @@ export default function RootLayout() {
     }
   }, [ready, session, segments]);
 
-  if (!ready) return null;
+  if (!ready) return <View style={{ flex: 1, backgroundColor: '#2A2B2A' }} />;
 
   return (
     <View className="flex-1 dark">
