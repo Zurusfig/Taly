@@ -258,10 +258,9 @@ For each period show:
 **Categories (expense)**: Food, Transport, Shopping, Entertainment, Bills, Health, Education, Subscriptions, Other
 **Categories (income)**: Salary, Freelance, Investment, Gift, Other
 
-## How to Use This Spec with Claude Code
+## Environment Status
 
-1. Save this file as `CLAUDE.md` at the project root
-2. Initialize: `npx create-expo-app finance-tracker --template default`
-3. First prompt: *"Read CLAUDE.md. Set up the project: install all listed dependencies, configure NativeWind and the Google Fonts, set up the Supabase client, and create the folder structure. Then create the colors and typography theme constants."*
-4. Then proceed phase by phase: *"Implement Phase 1 — start with the auth flow and onboarding screen."*
-5. After each phase, manually test before moving on
+- Supabase project is already created. All tables and RLS policies are migrated.
+- Env vars are in `.env` at project root (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`).
+- Do not write migration code or schema SQL — only client code.
+- The schema in this doc is for reference only; treat it as already deployed.
