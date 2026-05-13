@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,42 +7,84 @@ import {
   Platform,
   Alert,
   ScrollView,
+  TextInput,
+  TouchableOpacity,
 } from 'react-native';
-import * as Linking from 'expo-linking';
-import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
-// In Expo Go the scheme is exp+<slug>, in standalone builds it's the custom scheme
-const isExpoGo = Constants.appOwnership === 'expo';
-const REDIRECT_URL = isExpoGo
-  ? Linking.createURL('/auth/callback')
-  : 'financetracker://auth/callback';
-
 export default function SignIn() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [verifying, setVerifying] = useState(false);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
 
   const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const otpComplete = otp.every((d) => d !== '');
 
   async function handleSend() {
     if (!isValid) return;
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: REDIRECT_URL,
-      },
+      options: { shouldCreateUser: true },
     });
     setLoading(false);
     if (error) {
       Alert.alert('Error', error.message);
     } else {
       setSent(true);
+    }
+  }
+
+  async function handleVerify() {
+    const token = otp.join('');
+    if (token.length !== 6) return;
+    setVerifying(true);
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token,
+      type: 'email',
+    });
+    setVerifying(false);
+    if (error) {
+      Alert.alert('Invalid code', 'The code is incorrect or expired. Try requesting a new one.');
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+    }
+  }
+
+  function handleOtpKey(index: number, value: string) {
+    if (value.length > 1) {
+      // Handle paste: spread digits across boxes
+      const digits = value.replace(/\D/g, '').slice(0, 6).split('');
+      const next = [...otp];
+      digits.forEach((d, i) => { if (index + i < 6) next[index + i] = d; });
+      setOtp(next);
+      const focusIndex = Math.min(index + digits.length, 5);
+      inputRefs.current[focusIndex]?.focus();
+      return;
+    }
+    const next = [...otp];
+    next[index] = value.replace(/\D/g, '');
+    setOtp(next);
+    if (value && index < 5) inputRefs.current[index + 1]?.focus();
+  }
+
+  function handleOtpBackspace(index: number) {
+    if (otp[index] === '' && index > 0) {
+      const next = [...otp];
+      next[index - 1] = '';
+      setOtp(next);
+      inputRefs.current[index - 1]?.focus();
+    } else {
+      const next = [...otp];
+      next[index] = '';
+      setOtp(next);
     }
   }
 
@@ -60,21 +102,7 @@ export default function SignIn() {
           <Text style={styles.subtitle}>Track every baht.</Text>
         </View>
 
-        {sent ? (
-          <View style={styles.sentBox}>
-            <Text style={styles.sentTitle}>Check your email</Text>
-            <Text style={styles.sentBody}>
-              We sent a sign-in link to{'\n'}
-              <Text style={styles.sentEmail}>{email}</Text>
-            </Text>
-            <Button
-              label="Use a different email"
-              variant="ghost"
-              onPress={() => { setSent(false); setEmail(''); }}
-              style={styles.retryBtn}
-            />
-          </View>
-        ) : (
+        {!sent ? (
           <View style={styles.form}>
             <Input
               label="Email"
@@ -88,12 +116,50 @@ export default function SignIn() {
               onSubmitEditing={handleSend}
             />
             <Button
-              label="Send sign-in link"
+              label="Send code"
               onPress={handleSend}
               loading={loading}
               disabled={!isValid}
               style={styles.btn}
             />
+          </View>
+        ) : (
+          <View style={styles.otpSection}>
+            <Text style={styles.sentTitle}>Enter the code</Text>
+            <Text style={styles.sentBody}>
+              We sent a 6-digit code to{'\n'}
+              <Text style={styles.sentEmail}>{email}</Text>
+            </Text>
+
+            <View style={styles.otpRow}>
+              {otp.map((digit, i) => (
+                <TextInput
+                  key={i}
+                  ref={(r) => { inputRefs.current[i] = r; }}
+                  style={[styles.otpBox, digit !== '' && styles.otpBoxFilled]}
+                  value={digit}
+                  onChangeText={(v) => handleOtpKey(i, v)}
+                  onKeyPress={({ nativeEvent }) => {
+                    if (nativeEvent.key === 'Backspace') handleOtpBackspace(i);
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus={i === 0}
+                  selectTextOnFocus
+                />
+              ))}
+            </View>
+
+            <Button
+              label="Verify"
+              onPress={handleVerify}
+              loading={verifying}
+              disabled={!otpComplete}
+            />
+
+            <TouchableOpacity onPress={() => { setSent(false); setOtp(['', '', '', '', '', '']); }}>
+              <Text style={styles.retry}>Use a different email</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -124,10 +190,10 @@ const styles = StyleSheet.create({
   },
   form: { gap: 16 },
   btn: { marginTop: 4 },
-  sentBox: { gap: 12, alignItems: 'center' },
+  otpSection: { gap: 16, alignItems: 'center' },
   sentTitle: {
     fontFamily: 'InstrumentSerif_400Regular',
-    fontSize: 24,
+    fontSize: 28,
     color: colors.text,
   },
   sentBody: {
@@ -138,5 +204,30 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   sentEmail: { color: colors.text, fontFamily: 'Inter_500Medium' },
-  retryBtn: { marginTop: 8 },
+  otpRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginVertical: 8,
+  },
+  otpBox: {
+    width: 46,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    textAlign: 'center',
+    fontSize: 24,
+    fontFamily: 'Inter_500Medium',
+    color: colors.text,
+  },
+  otpBoxFilled: {
+    borderColor: colors.accent,
+  },
+  retry: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: colors.textMuted,
+    marginTop: 4,
+  },
 });
