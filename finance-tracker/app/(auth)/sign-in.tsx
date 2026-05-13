@@ -8,10 +8,18 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
+import * as Linking from 'expo-linking';
+import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+
+// In Expo Go the scheme is exp+<slug>, in standalone builds it's the custom scheme
+const isExpoGo = Constants.appOwnership === 'expo';
+const REDIRECT_URL = isExpoGo
+  ? Linking.createURL('/auth/callback')
+  : 'financetracker://auth/callback';
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
@@ -27,7 +35,7 @@ export default function SignIn() {
       email: email.trim().toLowerCase(),
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: 'financetracker://auth/callback',
+        emailRedirectTo: REDIRECT_URL,
       },
     });
     setLoading(false);
