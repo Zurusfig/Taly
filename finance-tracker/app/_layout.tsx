@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -14,8 +14,8 @@ import {
   Inter_600SemiBold,
 } from '@expo-google-fonts/inter';
 import { Session } from '@supabase/supabase-js';
-import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { colors } from '@/theme/colors';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -77,12 +77,16 @@ export default function RootLayout() {
     }
   }, [ready, session, segments]);
 
-  if (!ready) return <View style={{ flex: 1, backgroundColor: '#2A2B2A' }} />;
+  if (!ready) return <View style={styles.bg} />;
 
   return (
-    <View className="flex-1 dark">
+    <View style={styles.bg}>
       <Stack screenOptions={{ headerShown: false }} />
       <StatusBar style="light" />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  bg: { flex: 1, backgroundColor: colors.bg },
+});
