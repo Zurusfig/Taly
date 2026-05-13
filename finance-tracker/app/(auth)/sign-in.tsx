@@ -25,7 +25,10 @@ export default function SignIn() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: 'financetracker://auth/callback',
+      },
     });
     setLoading(false);
     if (error) {

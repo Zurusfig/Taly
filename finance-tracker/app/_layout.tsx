@@ -42,22 +42,25 @@ function useAuthSession() {
       setSession(session);
     });
 
-    // Handle magic-link deep link when app is already open
-    const linkSub = Linking.addEventListener('url', async ({ url }) => {
-      if (url.includes('access_token=') || url.includes('#')) {
-        const parsed = Linking.parse(url);
-        const hash = (parsed as any).path ?? '';
-        const params = Object.fromEntries(
-          (parsed.queryParams ?? {}),
-        ) as Record<string, string>;
-        if (params.access_token && params.refresh_token) {
-          await supabase.auth.setSession({
-            access_token: params.access_token,
-            refresh_token: params.refresh_token,
-          });
-        }
+    // Handle magic-link token from deep link URL (fragment or query params)
+    async function handleUrl(url: string) {
+      if (!url.includes('access_token')) return;
+      // Tokens arrive in the fragment (#access_token=...) — split manually
+      const fragment = url.includes('#') ? url.split('#')[1] : url.split('?')[1] ?? '';
+      const params = Object.fromEntries(new URLSearchParams(fragment)) as Record<string, string>;
+      if (params.access_token && params.refresh_token) {
+        await supabase.auth.setSession({
+          access_token: params.access_token,
+          refresh_token: params.refresh_token,
+        });
       }
-    });
+    }
+
+    // Cold-launch: app opened via magic link tap
+    Linking.getInitialURL().then((url) => { if (url) handleUrl(url); });
+
+    // Warm-launch: app already open when link is tapped
+    const linkSub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
 
     return () => {
       clearTimeout(timeout);
