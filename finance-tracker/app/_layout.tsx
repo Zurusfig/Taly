@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Linking from 'expo-linking';
 import {
   useFonts,
   InstrumentSerif_400Regular,
@@ -13,8 +14,10 @@ import {
   Inter_500Medium,
   Inter_600SemiBold,
 } from '@expo-google-fonts/inter';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { queryClient } from '@/lib/queryClient';
 import { colors } from '@/theme/colors';
 
 SplashScreen.preventAutoHideAsync();
@@ -24,7 +27,6 @@ function useAuthSession() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 5-second timeout so a bad/missing Supabase URL doesn't leave the app blank.
     const timeout = setTimeout(() => setLoading(false), 5000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -40,16 +42,34 @@ function useAuthSession() {
       setSession(session);
     });
 
+    // Handle magic-link deep link when app is already open
+    const linkSub = Linking.addEventListener('url', async ({ url }) => {
+      if (url.includes('access_token=') || url.includes('#')) {
+        const parsed = Linking.parse(url);
+        const hash = (parsed as any).path ?? '';
+        const params = Object.fromEntries(
+          (parsed.queryParams ?? {}),
+        ) as Record<string, string>;
+        if (params.access_token && params.refresh_token) {
+          await supabase.auth.setSession({
+            access_token: params.access_token,
+            refresh_token: params.refresh_token,
+          });
+        }
+      }
+    });
+
     return () => {
       clearTimeout(timeout);
       subscription.unsubscribe();
+      linkSub.remove();
     };
   }, []);
 
   return { session, loading };
 }
 
-export default function RootLayout() {
+function RootLayoutInner() {
   const [fontsLoaded, fontError] = useFonts({
     InstrumentSerif_400Regular,
     InstrumentSerif_400Regular_Italic,
@@ -66,13 +86,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!ready) return;
-
     SplashScreen.hideAsync();
 
-    const inAuthGroup = segments[0] === '(auth)';
-    if (!session && !inAuthGroup) {
+    const inAuth = segments[0] === '(auth)';
+    if (!session && !inAuth) {
       router.replace('/(auth)/sign-in');
-    } else if (session && inAuthGroup) {
+    } else if (session && inAuth) {
       router.replace('/(app)');
     }
   }, [ready, session, segments]);
@@ -81,9 +100,20 @@ export default function RootLayout() {
 
   return (
     <View style={styles.bg}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(app)" />
+      </Stack>
       <StatusBar style="light" />
     </View>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RootLayoutInner />
+    </QueryClientProvider>
   );
 }
 
