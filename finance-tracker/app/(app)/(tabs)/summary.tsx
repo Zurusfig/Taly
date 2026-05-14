@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, Circle } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { formatAmount } from '@/lib/utils';
 import { useSummary, type Period, type TrendPoint } from '@/hooks/useSummary';
@@ -15,53 +14,15 @@ const PERIODS: { key: Period; label: string }[] = [
   { key: 'year', label: 'Year' },
 ];
 
-// ─── Donut Chart ──────────────────────────────────────────────────────────────
+// ─── Segment Bar (replaces SVG donut — no native deps) ────────────────────────
 
-function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
-  const rad = ((angleDeg - 90) * Math.PI) / 180;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-}
-
-function arcPath(cx: number, cy: number, r: number, start: number, end: number) {
-  if (end - start >= 360) end = 359.999;
-  const s = polarToCartesian(cx, cy, r, start);
-  const e = polarToCartesian(cx, cy, r, end);
-  const large = end - start > 180 ? 1 : 0;
-  return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
-}
-
-interface DonutProps {
-  data: { color: string; percentage: number }[];
-  size?: number;
-  thickness?: number;
-}
-
-function DonutChart({ data, size = 160, thickness = 28 }: DonutProps) {
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = (size - thickness) / 2;
-  let current = 0;
-
+function SegmentBar({ data }: { data: { color: string; percentage: number }[] }) {
   return (
-    <Svg width={size} height={size}>
-      <Circle cx={cx} cy={cy} r={r + thickness / 2} stroke={colors.bgElevated} strokeWidth={thickness} fill="none" />
-      {data.map((slice, i) => {
-        const start = current;
-        const sweep = (slice.percentage / 100) * 360;
-        current += sweep;
-        if (sweep < 0.5) return null;
-        return (
-          <Path
-            key={i}
-            d={arcPath(cx, cy, r, start, start + sweep)}
-            stroke={slice.color}
-            strokeWidth={thickness}
-            fill="none"
-            strokeLinecap="butt"
-          />
-        );
-      })}
-    </Svg>
+    <View style={styles.segmentBar}>
+      {data.map((slice, i) => (
+        <View key={i} style={{ flex: slice.percentage, backgroundColor: slice.color }} />
+      ))}
+    </View>
   );
 }
 
@@ -173,30 +134,21 @@ export default function SummaryScreen() {
             </View>
           </View>
 
-          {/* Category donut */}
+          {/* Category breakdown */}
           {top5.length > 0 && (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Spending by category</Text>
-              <View style={styles.donutRow}>
-                <DonutChart data={top5} />
-                <View style={styles.legend}>
-                  {top5.map((s) => (
-                    <View key={s.categoryId ?? 'none'} style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: s.color }]} />
-                      <Text style={styles.legendName} numberOfLines={1}>{s.name}</Text>
-                      <Text style={styles.legendPct}>{s.percentage.toFixed(0)}%</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              {top5.map((s) => (
-                <View key={s.categoryId ?? 'none'} style={styles.catRow}>
-                  <View style={[styles.catBar]}>
-                    <View style={[styles.catFill, { width: `${s.percentage}%` as any, backgroundColor: s.color }]} />
+              <SegmentBar data={top5} />
+              <View style={styles.legend}>
+                {top5.map((s) => (
+                  <View key={s.categoryId ?? 'none'} style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: s.color }]} />
+                    <Text style={styles.legendName} numberOfLines={1}>{s.name}</Text>
+                    <Text style={styles.legendPct}>{s.percentage.toFixed(0)}%</Text>
+                    <Text style={styles.catAmount}>฿{formatAmount(s.amount)}</Text>
                   </View>
-                  <Text style={styles.catAmount}>฿{formatAmount(s.amount)}</Text>
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
           )}
 
@@ -268,17 +220,13 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.bgElevated, borderRadius: 14, padding: 16, gap: 12 },
   cardTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 0.8 },
 
-  donutRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  legend: { flex: 1, gap: 8 },
+  segmentBar: { height: 12, flexDirection: 'row', borderRadius: 6, overflow: 'hidden', gap: 1 },
+  legend: { gap: 8 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendName: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.text },
+  legendName: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 13, color: colors.text },
   legendPct: { fontFamily: 'Inter_500Medium', fontSize: 12, color: colors.textMuted },
-
-  catRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  catBar: { flex: 1, height: 4, backgroundColor: colors.bgInput, borderRadius: 2, overflow: 'hidden' },
-  catFill: { height: '100%', borderRadius: 2 },
-  catAmount: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textMuted, width: 72, textAlign: 'right' },
+  catAmount: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textMuted, minWidth: 68, textAlign: 'right' },
 
   trendLabels: { flexDirection: 'row', gap: 16 },
   trendLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
