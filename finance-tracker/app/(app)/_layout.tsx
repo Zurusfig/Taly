@@ -8,7 +8,7 @@ export default function AppLayout() {
         name="quick-log"
         options={{
           presentation: 'formSheet',
-          sheetAllowedDetents: [0.85, 1.0],
+          sheetAllowedDetents: [0.72, 1.0],
           sheetInitialDetentIndex: 0,
           sheetGrabberVisible: true,
           contentStyle: { backgroundColor: '#2A2B2A' },

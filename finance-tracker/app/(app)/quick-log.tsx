@@ -2,6 +2,7 @@ import { useState, Fragment } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   Alert,
@@ -115,6 +116,7 @@ export default function QuickLog() {
   const createTx = useCreateTransaction();
 
   const [amountStr, setAmountStr] = useState('0');
+  const [note, setNote] = useState('');
   const [showWalletPicker, setShowWalletPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showToWalletPicker, setShowToWalletPicker] = useState(false);
@@ -145,6 +147,7 @@ export default function QuickLog() {
         to_wallet_id: effectiveToWalletId,
         type,
         amount,
+        note: note.trim() || null,
       });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
@@ -173,6 +176,16 @@ export default function QuickLog() {
           <PillButton label={activeCategory?.name ?? 'Category'} onPress={() => setShowCategoryPicker(true)} active={!!activeCategory} />
         )}
       </View>
+
+      <TextInput
+        style={styles.noteInput}
+        value={note}
+        onChangeText={setNote}
+        placeholder="Add a note…"
+        placeholderTextColor={colors.textDim}
+        returnKeyType="done"
+        maxLength={120}
+      />
 
       <View style={styles.numpad}>
         <NumPad onKey={(key) => setAmountStr((prev) => handleKey(prev, key))} />
@@ -236,6 +249,15 @@ const styles = StyleSheet.create({
   currencySymbol: { fontFamily: 'InstrumentSerif_400Regular', fontSize: 28, paddingBottom: 6 },
   amount: { fontFamily: 'InstrumentSerif_400Regular', fontSize: 52, fontVariant: ['tabular-nums'], maxWidth: 280 },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  noteInput: {
+    backgroundColor: colors.bgElevated,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: colors.text,
+  },
   numpad: { flex: 1 },
   saveBtn: { marginTop: 4 },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },

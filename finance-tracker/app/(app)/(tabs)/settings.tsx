@@ -61,13 +61,13 @@ export default function SettingsScreen() {
           <SettingsRow
             icon={<Wallet size={18} color={colors.textMuted} />}
             label="Wallets"
-            onPress={() => router.push('/(app)/wallets/index')}
+            onPress={() => router.push('/(app)/wallets')}
           />
           <View style={styles.divider} />
           <SettingsRow
             icon={<Tag size={18} color={colors.textMuted} />}
             label="Categories"
-            onPress={() => router.push('/(app)/categories/index')}
+            onPress={() => router.push('/(app)/categories')}
           />
         </View>
       </View>

@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
   bar: {
     borderTopWidth: 0,
     elevation: 0,
-    height: 64,
+    height: 76,
     backgroundColor: colors.bgElevated,
   },
   barBg: { flex: 1, backgroundColor: colors.bgElevated },
