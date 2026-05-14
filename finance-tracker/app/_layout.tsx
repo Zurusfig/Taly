@@ -89,7 +89,7 @@ function RootLayoutInner() {
 
   useEffect(() => {
     if (!ready) return;
-    SplashScreen.hideAsync();
+    SplashScreen.hideAsync().catch(() => {});
 
     const inAuth = segments[0] === '(auth)';
     if (!session && !inAuth) {
