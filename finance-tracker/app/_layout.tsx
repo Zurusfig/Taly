@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -21,6 +21,10 @@ import { queryClient } from '@/lib/queryClient';
 import { colors } from '@/theme/colors';
 
 SplashScreen.preventAutoHideAsync();
+
+// Expo fires SplashScreen.hideAsync() for every view controller (including sheets/modals),
+// but the splash was only shown for the root controller. Suppress the spurious native error.
+LogBox.ignoreLogs(['No native splash screen registered']);
 
 function useAuthSession() {
   const [session, setSession] = useState<Session | null>(null);
