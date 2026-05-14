@@ -209,7 +209,7 @@ export default function HomeScreen() {
 
       {/* FAB */}
       <TouchableOpacity
-        style={[styles.fab, { bottom: 90 + insets.bottom }]}
+        style={[styles.fab, { bottom: 84 + insets.bottom }]}
         onPress={() => router.push('/(app)/quick-log')}
         activeOpacity={0.85}
       >

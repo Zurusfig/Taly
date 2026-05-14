@@ -29,7 +29,7 @@ LogBox.ignoreLogs(['No native splash screen registered']);
 
 const TYPE_COLORS: Record<TransactionType, string> = {
   expense: colors.danger,
-  income: '#4CAF50',
+  income: colors.accent,
   transfer: colors.warning,
 };
 
@@ -169,11 +169,26 @@ export default function QuickLog() {
       </View>
 
       <View style={styles.pills}>
-        <PillButton label={activeWallet?.name ?? 'Wallet'} onPress={() => setShowWalletPicker(true)} active={!!activeWallet} />
+        <PillButton
+          label={activeWallet?.name ?? 'Wallet'}
+          onPress={() => setShowWalletPicker(true)}
+          active={!!activeWallet}
+          dotColor={activeWallet?.color ?? null}
+        />
         {type === 'transfer' ? (
-          <PillButton label={activeToWallet?.name ?? 'To wallet'} onPress={() => setShowToWalletPicker(true)} active={!!activeToWallet} />
+          <PillButton
+            label={activeToWallet?.name ?? 'To wallet'}
+            onPress={() => setShowToWalletPicker(true)}
+            active={!!activeToWallet}
+            dotColor={activeToWallet?.color ?? null}
+          />
         ) : (
-          <PillButton label={activeCategory?.name ?? 'Category'} onPress={() => setShowCategoryPicker(true)} active={!!activeCategory} />
+          <PillButton
+            label={activeCategory?.name ?? 'Category'}
+            onPress={() => setShowCategoryPicker(true)}
+            active={!!activeCategory}
+            dotColor={activeCategory?.color ?? null}
+          />
         )}
       </View>
 
