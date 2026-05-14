@@ -4,7 +4,7 @@ import {
   startOfMonth, endOfMonth,
   startOfYear, endOfYear,
   eachDayOfInterval, eachMonthOfInterval,
-  format, getDate, getMonth,
+  format,
 } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import type { Transaction } from '@/lib/types';
@@ -19,11 +19,20 @@ export interface CategorySlice {
   percentage: number;
 }
 
+export interface StackedCategory {
+  id: string | null;
+  name: string;
+  color: string;
+  amount: number;
+}
+
 export interface TrendPoint {
-  x: number;   // day-of-month or month index
+  x: number;
   label: string;
   income: number;
   expense: number;
+  count: number;
+  categories: StackedCategory[];
 }
 
 export interface SummaryData {
@@ -40,6 +49,25 @@ function getPeriodRange(period: Period, ref: Date) {
     case 'month': return { start: startOfMonth(ref), end: endOfMonth(ref) };
     case 'year':  return { start: startOfYear(ref), end: endOfYear(ref) };
   }
+}
+
+function buildCategories(
+  txs: Transaction[],
+  lookup: Record<string, { name: string; color: string }>,
+): StackedCategory[] {
+  const amounts: Record<string, number> = {};
+  for (const t of txs) {
+    const key = t.category_id ?? '__none__';
+    amounts[key] = (amounts[key] ?? 0) + Number(t.amount);
+  }
+  return Object.entries(amounts)
+    .map(([id, amount]) => ({
+      id: id === '__none__' ? null : id,
+      name: id === '__none__' ? 'Uncategorized' : (lookup[id]?.name ?? 'Unknown'),
+      color: id === '__none__' ? '#7F8C8D' : (lookup[id]?.color ?? '#7F8C8D'),
+      amount,
+    }))
+    .sort((a, b) => b.amount - a.amount);
 }
 
 export function useSummary(period: Period, ref: Date = new Date()) {
@@ -61,57 +89,56 @@ export function useSummary(period: Period, ref: Date = new Date()) {
       if (cErr) throw cErr;
 
       const transactions = (txs ?? []) as Transaction[];
-      const catMap = Object.fromEntries((cats ?? []).map((c) => [c.id, c]));
+      const lookup = Object.fromEntries((cats ?? []).map((c) => [c.id, c]));
 
-      // Stats
       const income = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
       const expense = transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
 
-      // Category breakdown (expenses only)
       const expenseTxs = transactions.filter((t) => t.type === 'expense');
-      const byCategory: Record<string, number> = {};
+      const byCat: Record<string, number> = {};
       for (const t of expenseTxs) {
         const key = t.category_id ?? '__none__';
-        byCategory[key] = (byCategory[key] ?? 0) + Number(t.amount);
+        byCat[key] = (byCat[key] ?? 0) + Number(t.amount);
       }
-      const categoryBreakdown: CategorySlice[] = Object.entries(byCategory)
+      const categoryBreakdown: CategorySlice[] = Object.entries(byCat)
         .map(([id, amount]) => ({
           categoryId: id === '__none__' ? null : id,
-          name: id === '__none__' ? 'Uncategorized' : (catMap[id]?.name ?? 'Unknown'),
-          color: id === '__none__' ? '#7F8C8D' : (catMap[id]?.color ?? '#7F8C8D'),
+          name: id === '__none__' ? 'Uncategorized' : (lookup[id]?.name ?? 'Unknown'),
+          color: id === '__none__' ? '#7F8C8D' : (lookup[id]?.color ?? '#7F8C8D'),
           amount,
           percentage: expense > 0 ? (amount / expense) * 100 : 0,
         }))
         .sort((a, b) => b.amount - a.amount);
 
-      // Trend
       let trend: TrendPoint[] = [];
       if (period === 'week' || period === 'month') {
         const days = eachDayOfInterval({ start, end });
         trend = days.map((day, i) => {
-          const dayLabel = format(day, 'yyyy-MM-dd');
-          const dayTxs = transactions.filter((t) => {
-            return format(new Date(t.occurred_at), 'yyyy-MM-dd') === dayLabel;
-          });
+          const key = format(day, 'yyyy-MM-dd');
+          const dayTxs = transactions.filter((t) => format(new Date(t.occurred_at), 'yyyy-MM-dd') === key);
+          const dayExp = dayTxs.filter((t) => t.type === 'expense');
           return {
             x: i,
             label: format(day, period === 'week' ? 'EEE' : 'd'),
             income: dayTxs.filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
-            expense: dayTxs.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
+            expense: dayExp.reduce((s, t) => s + Number(t.amount), 0),
+            count: dayTxs.length,
+            categories: buildCategories(dayExp, lookup),
           };
         });
       } else {
         const months = eachMonthOfInterval({ start, end });
         trend = months.map((month, i) => {
-          const monthLabel = format(month, 'yyyy-MM');
-          const monthTxs = transactions.filter((t) => {
-            return format(new Date(t.occurred_at), 'yyyy-MM') === monthLabel;
-          });
+          const key = format(month, 'yyyy-MM');
+          const mTxs = transactions.filter((t) => format(new Date(t.occurred_at), 'yyyy-MM') === key);
+          const mExp = mTxs.filter((t) => t.type === 'expense');
           return {
             x: i,
             label: format(month, 'MMM'),
-            income: monthTxs.filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
-            expense: monthTxs.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
+            income: mTxs.filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
+            expense: mExp.reduce((s, t) => s + Number(t.amount), 0),
+            count: mTxs.length,
+            categories: buildCategories(mExp, lookup),
           };
         });
       }

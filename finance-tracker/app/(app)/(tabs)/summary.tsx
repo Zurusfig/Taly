@@ -3,8 +3,9 @@ import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
 import { formatAmount } from '@/lib/utils';
-import { useSummary, type Period, type TrendPoint } from '@/hooks/useSummary';
+import { useSummary, type Period } from '@/hooks/useSummary';
 import { useBudgets } from '@/hooks/useBudgets';
+import { TrendChart } from '@/components/charts/TrendChart';
 
 // ─── Period Selector ──────────────────────────────────────────────────────────
 
@@ -14,7 +15,7 @@ const PERIODS: { key: Period; label: string }[] = [
   { key: 'year', label: 'Year' },
 ];
 
-// ─── Segment Bar (replaces SVG donut — no native deps) ────────────────────────
+// ─── Segment Bar (spending by category) ──────────────────────────────────────
 
 function SegmentBar({ data }: { data: { color: string; percentage: number }[] }) {
   return (
@@ -51,28 +52,6 @@ function BudgetBar({ name, color, spent, amount }: { name: string; color?: strin
   );
 }
 
-// ─── Trend Bars ───────────────────────────────────────────────────────────────
-
-function TrendBars({ trend }: { trend: TrendPoint[] }) {
-  const maxVal = Math.max(...trend.map((p) => Math.max(p.income, p.expense)), 1);
-
-  return (
-    <View>
-      <View style={styles.trendChart}>
-        {trend.map((p) => (
-          <View key={p.x} style={styles.trendCol}>
-            <View style={styles.trendBars}>
-              <View style={[styles.trendBar, { height: `${(p.expense / maxVal) * 100}%` as any, backgroundColor: colors.danger }]} />
-              <View style={[styles.trendBar, { height: `${(p.income / maxVal) * 100}%` as any, backgroundColor: colors.accent }]} />
-            </View>
-            <Text style={styles.xLabel}>{p.label}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SummaryScreen() {
@@ -82,12 +61,11 @@ export default function SummaryScreen() {
   const { data: budgets } = useBudgets();
 
   const top5 = summary?.categoryBreakdown.slice(0, 5) ?? [];
-  const hasTrend = (summary?.trend ?? []).some((p) => p.income > 0 || p.expense > 0);
   const activeBudgets = (budgets ?? []).filter((b) => {
-    const periodMatch = period === 'week' ? b.period === 'weekly'
+    const match = period === 'week' ? b.period === 'weekly'
       : period === 'month' ? b.period === 'monthly'
       : b.period === 'yearly';
-    return periodMatch;
+    return match;
   });
 
   return (
@@ -134,7 +112,25 @@ export default function SummaryScreen() {
             </View>
           </View>
 
-          {/* Category breakdown */}
+          {/* Trend chart */}
+          <View style={styles.card}>
+            <View style={styles.trendHeader}>
+              <Text style={styles.cardTitle}>Trend</Text>
+              <View style={styles.trendLegend}>
+                <View style={styles.trendLegendItem}>
+                  <View style={[styles.trendDot, { backgroundColor: colors.danger }]} />
+                  <Text style={styles.trendLegendText}>Exp</Text>
+                </View>
+                <View style={styles.trendLegendItem}>
+                  <View style={[styles.trendDot, { backgroundColor: colors.accent }]} />
+                  <Text style={styles.trendLegendText}>Inc</Text>
+                </View>
+              </View>
+            </View>
+            <TrendChart trend={summary?.trend ?? []} isLoading={isLoading} />
+          </View>
+
+          {/* Spending by category */}
           {top5.length > 0 && (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Spending by category</Text>
@@ -145,28 +141,10 @@ export default function SummaryScreen() {
                     <View style={[styles.legendDot, { backgroundColor: s.color }]} />
                     <Text style={styles.legendName} numberOfLines={1}>{s.name}</Text>
                     <Text style={styles.legendPct}>{s.percentage.toFixed(0)}%</Text>
-                    <Text style={styles.catAmount}>฿{formatAmount(s.amount)}</Text>
+                    <Text style={styles.legendAmount}>฿{formatAmount(s.amount)}</Text>
                   </View>
                 ))}
               </View>
-            </View>
-          )}
-
-          {/* Trend */}
-          {hasTrend && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Trend</Text>
-              <View style={styles.trendLabels}>
-                <View style={styles.trendLegendItem}>
-                  <View style={[styles.trendDot, { backgroundColor: colors.danger }]} />
-                  <Text style={styles.trendLegendText}>Expense</Text>
-                </View>
-                <View style={styles.trendLegendItem}>
-                  <View style={[styles.trendDot, { backgroundColor: colors.accent }]} />
-                  <Text style={styles.trendLegendText}>Income</Text>
-                </View>
-              </View>
-              <TrendBars trend={summary!.trend} />
             </View>
           )}
 
@@ -186,7 +164,7 @@ export default function SummaryScreen() {
             </View>
           )}
 
-          {top5.length === 0 && !hasTrend && (
+          {top5.length === 0 && !summary?.trend.some((p) => p.income > 0 || p.expense > 0) && (
             <View style={styles.empty}>
               <Text style={styles.emptyText}>No transactions this {period}.</Text>
             </View>
@@ -220,23 +198,19 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.bgElevated, borderRadius: 14, padding: 16, gap: 12 },
   cardTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 0.8 },
 
+  trendHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  trendLegend: { flexDirection: 'row', gap: 10 },
+  trendLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  trendDot: { width: 7, height: 7, borderRadius: 3.5 },
+  trendLegendText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: colors.textMuted },
+
   segmentBar: { height: 12, flexDirection: 'row', borderRadius: 6, overflow: 'hidden', gap: 1 },
   legend: { gap: 8 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendName: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 13, color: colors.text },
   legendPct: { fontFamily: 'Inter_500Medium', fontSize: 12, color: colors.textMuted },
-  catAmount: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textMuted, minWidth: 68, textAlign: 'right' },
-
-  trendLabels: { flexDirection: 'row', gap: 16 },
-  trendLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  trendDot: { width: 8, height: 8, borderRadius: 4 },
-  trendLegendText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textMuted },
-  trendChart: { flexDirection: 'row', alignItems: 'flex-end', height: 80, gap: 3 },
-  trendCol: { flex: 1, alignItems: 'center', gap: 4 },
-  trendBars: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 1, width: '100%' },
-  trendBar: { flex: 1, borderRadius: 2, minHeight: 2 },
-  xLabel: { fontFamily: 'Inter_400Regular', fontSize: 9, color: colors.textDim },
+  legendAmount: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textMuted, minWidth: 68, textAlign: 'right' },
 
   budgetRow: { gap: 6 },
   budgetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
