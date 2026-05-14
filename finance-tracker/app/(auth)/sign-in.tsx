@@ -53,7 +53,7 @@ export default function SignIn() {
     setVerifying(false);
     if (error) {
       Alert.alert('Invalid code', 'The code is incorrect or expired. Try requesting a new one.');
-      setOtp(['', '', '', '', '', '']);
+      setOtp(['', '', '', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     }
   }
