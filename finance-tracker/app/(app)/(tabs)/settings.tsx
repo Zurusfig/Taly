@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Wallet,
   Tag,
+  Target,
   LogOut,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
@@ -68,6 +69,12 @@ export default function SettingsScreen() {
             icon={<Tag size={18} color={colors.textMuted} />}
             label="Categories"
             onPress={() => router.push('/(app)/categories')}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            icon={<Target size={18} color={colors.textMuted} />}
+            label="Budgets"
+            onPress={() => router.push('/(app)/budgets')}
           />
         </View>
       </View>
