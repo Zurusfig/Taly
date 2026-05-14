@@ -34,7 +34,9 @@ export function useCreateWallet() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: WalletInput) => {
-      const { data, error } = await supabase.from('wallets').insert(input).select().single();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const { data, error } = await supabase.from('wallets').insert({ ...input, user_id: user.id }).select().single();
       if (error) throw error;
       return data;
     },

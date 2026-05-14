@@ -81,8 +81,11 @@ export function useCreateTransaction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateTransactionInput) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
       const payload = {
         ...input,
+        user_id: user.id,
         occurred_at: input.occurred_at ?? new Date().toISOString(),
       };
       const { data, error } = await supabase.from('transactions').insert(payload).select().single();

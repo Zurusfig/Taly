@@ -22,7 +22,10 @@ const DEFAULT_CATEGORIES: Array<Pick<Category, 'name' | 'kind' | 'icon' | 'color
 ];
 
 export async function seedDefaultCategories() {
-  const { error } = await supabase.from('categories').insert(DEFAULT_CATEGORIES);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  const rows = DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: user.id }));
+  const { error } = await supabase.from('categories').insert(rows);
   if (error) throw error;
 }
 
@@ -45,7 +48,9 @@ export function useCreateCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CategoryInput) => {
-      const { data, error } = await supabase.from('categories').insert(input).select().single();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const { data, error } = await supabase.from('categories').insert({ ...input, user_id: user.id }).select().single();
       if (error) throw error;
       return data;
     },
