@@ -19,7 +19,7 @@ export default function SignIn() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
   const [verifying, setVerifying] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
@@ -43,7 +43,7 @@ export default function SignIn() {
 
   async function handleVerify() {
     const token = otp.join('');
-    if (token.length !== 6) return;
+    if (token.length !== 8) return;
     setVerifying(true);
     const { error } = await supabase.auth.verifyOtp({
       email: email.trim().toLowerCase(),
@@ -61,18 +61,18 @@ export default function SignIn() {
   function handleOtpKey(index: number, value: string) {
     if (value.length > 1) {
       // Handle paste: spread digits across boxes
-      const digits = value.replace(/\D/g, '').slice(0, 6).split('');
+      const digits = value.replace(/\D/g, '').slice(0, 8).split('');
       const next = [...otp];
-      digits.forEach((d, i) => { if (index + i < 6) next[index + i] = d; });
+      digits.forEach((d, i) => { if (index + i < 8) next[index + i] = d; });
       setOtp(next);
-      const focusIndex = Math.min(index + digits.length, 5);
+      const focusIndex = Math.min(index + digits.length, 7);
       inputRefs.current[focusIndex]?.focus();
       return;
     }
     const next = [...otp];
     next[index] = value.replace(/\D/g, '');
     setOtp(next);
-    if (value && index < 5) inputRefs.current[index + 1]?.focus();
+    if (value && index < 7) inputRefs.current[index + 1]?.focus();
   }
 
   function handleOtpBackspace(index: number) {
@@ -127,7 +127,7 @@ export default function SignIn() {
           <View style={styles.otpSection}>
             <Text style={styles.sentTitle}>Enter the code</Text>
             <Text style={styles.sentBody}>
-              We sent a 6-digit code to{'\n'}
+              We sent an 8-digit code to{'\n'}
               <Text style={styles.sentEmail}>{email}</Text>
             </Text>
 
@@ -206,12 +206,12 @@ const styles = StyleSheet.create({
   sentEmail: { color: colors.text, fontFamily: 'Inter_500Medium' },
   otpRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     marginVertical: 8,
   },
   otpBox: {
-    width: 46,
-    height: 56,
+    width: 38,
+    height: 52,
     borderRadius: 12,
     backgroundColor: colors.bgElevated,
     borderWidth: 1,
