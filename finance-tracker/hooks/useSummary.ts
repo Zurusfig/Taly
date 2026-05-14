@@ -89,8 +89,10 @@ export function useSummary(period: Period, ref: Date = new Date()) {
       if (period === 'week' || period === 'month') {
         const days = eachDayOfInterval({ start, end });
         trend = days.map((day, i) => {
-          const dayStr = format(day, 'yyyy-MM-dd');
-          const dayTxs = transactions.filter((t) => t.occurred_at.startsWith(dayStr));
+          const dayLabel = format(day, 'yyyy-MM-dd');
+          const dayTxs = transactions.filter((t) => {
+            return format(new Date(t.occurred_at), 'yyyy-MM-dd') === dayLabel;
+          });
           return {
             x: i,
             label: format(day, period === 'week' ? 'EEE' : 'd'),
@@ -101,9 +103,9 @@ export function useSummary(period: Period, ref: Date = new Date()) {
       } else {
         const months = eachMonthOfInterval({ start, end });
         trend = months.map((month, i) => {
+          const monthLabel = format(month, 'yyyy-MM');
           const monthTxs = transactions.filter((t) => {
-            const d = new Date(t.occurred_at);
-            return getMonth(d) === i;
+            return format(new Date(t.occurred_at), 'yyyy-MM') === monthLabel;
           });
           return {
             x: i,

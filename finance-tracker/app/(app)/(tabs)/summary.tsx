@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, G, Circle } from 'react-native-svg';
-import { CartesianChart, Line } from 'victory-native';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { colors } from '@/theme/colors';
-import { formatAmount, formatCurrency } from '@/lib/utils';
-import { useSummary, type Period } from '@/hooks/useSummary';
+import { formatAmount } from '@/lib/utils';
+import { useSummary, type Period, type TrendPoint } from '@/hooks/useSummary';
 import { useBudgets } from '@/hooks/useBudgets';
 
 // ─── Period Selector ──────────────────────────────────────────────────────────
@@ -86,6 +85,28 @@ function BudgetBar({ name, color, spent, amount }: { name: string; color?: strin
       </View>
       <View style={styles.track}>
         <View style={[styles.fill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
+      </View>
+    </View>
+  );
+}
+
+// ─── Trend Bars ───────────────────────────────────────────────────────────────
+
+function TrendBars({ trend }: { trend: TrendPoint[] }) {
+  const maxVal = Math.max(...trend.map((p) => Math.max(p.income, p.expense)), 1);
+
+  return (
+    <View>
+      <View style={styles.trendChart}>
+        {trend.map((p) => (
+          <View key={p.x} style={styles.trendCol}>
+            <View style={styles.trendBars}>
+              <View style={[styles.trendBar, { height: `${(p.expense / maxVal) * 100}%` as any, backgroundColor: colors.danger }]} />
+              <View style={[styles.trendBar, { height: `${(p.income / maxVal) * 100}%` as any, backgroundColor: colors.accent }]} />
+            </View>
+            <Text style={styles.xLabel}>{p.label}</Text>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -193,42 +214,7 @@ export default function SummaryScreen() {
                   <Text style={styles.trendLegendText}>Income</Text>
                 </View>
               </View>
-              <View style={{ height: 180 }}>
-                <CartesianChart
-                  data={summary!.trend}
-                  xKey="x"
-                  yKeys={['expense', 'income']}
-                >
-                  {({ points }) => (
-                    <>
-                      <Line
-                        points={points.expense}
-                        color={colors.danger}
-                        strokeWidth={2}
-                        animate={{ type: 'timing', duration: 400 }}
-                      />
-                      <Line
-                        points={points.income}
-                        color={colors.accent}
-                        strokeWidth={2}
-                        animate={{ type: 'timing', duration: 400 }}
-                      />
-                    </>
-                  )}
-                </CartesianChart>
-              </View>
-              {/* X-axis labels */}
-              <View style={styles.xAxis}>
-                {summary!.trend
-                  .filter((_, i) => {
-                    const total = summary!.trend.length;
-                    if (total <= 12) return true;
-                    return i % Math.ceil(total / 8) === 0;
-                  })
-                  .map((p) => (
-                    <Text key={p.x} style={styles.xLabel}>{p.label}</Text>
-                  ))}
-              </View>
+              <TrendBars trend={summary!.trend} />
             </View>
           )}
 
@@ -298,8 +284,11 @@ const styles = StyleSheet.create({
   trendLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   trendDot: { width: 8, height: 8, borderRadius: 4 },
   trendLegendText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textMuted },
-  xAxis: { flexDirection: 'row', justifyContent: 'space-between' },
-  xLabel: { fontFamily: 'Inter_400Regular', fontSize: 10, color: colors.textDim },
+  trendChart: { flexDirection: 'row', alignItems: 'flex-end', height: 80, gap: 3 },
+  trendCol: { flex: 1, alignItems: 'center', gap: 4 },
+  trendBars: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 1, width: '100%' },
+  trendBar: { flex: 1, borderRadius: 2, minHeight: 2 },
+  xLabel: { fontFamily: 'Inter_400Regular', fontSize: 9, color: colors.textDim },
 
   budgetRow: { gap: 6 },
   budgetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
