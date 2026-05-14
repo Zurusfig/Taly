@@ -160,7 +160,7 @@ export default function HomeScreen() {
         {/* Wallet cards */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Wallets</Text>
-          <TouchableOpacity onPress={() => router.push('/(app)/wallets/index')}>
+          <TouchableOpacity onPress={() => router.push('/(app)/wallets')}>
             <Text style={styles.sectionAction}>Manage</Text>
           </TouchableOpacity>
         </View>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Fragment } from 'react';
 import {
   View,
   Text,
@@ -94,14 +94,14 @@ function TypeToggle({
   return (
     <View style={styles.typeRow}>
       {TYPES.map(({ key, label }, i) => (
-        <>
-          {i > 0 && <Text key={`sep-${key}`} style={styles.typeSep}>·</Text>}
-          <TouchableOpacity key={key} onPress={() => onChange(key)} activeOpacity={0.7}>
+        <Fragment key={key}>
+          {i > 0 && <Text style={styles.typeSep}>·</Text>}
+          <TouchableOpacity onPress={() => onChange(key)} activeOpacity={0.7}>
             <Text style={[styles.typeLabel, value === key && styles.typeLabelActive]}>
               {label}
             </Text>
           </TouchableOpacity>
-        </>
+        </Fragment>
       ))}
     </View>
   );
