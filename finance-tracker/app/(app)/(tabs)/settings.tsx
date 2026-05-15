@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Switch, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Switch, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -166,6 +166,7 @@ export default function SettingsScreen() {
       <View style={styles.topBar}>
         <Text style={styles.screenTitle}>Settings</Text>
       </View>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]} showsVerticalScrollIndicator={false}>
 
       {/* Streak card */}
       {(streak?.current ?? 0) > 0 && (
@@ -257,12 +258,14 @@ export default function SettingsScreen() {
           />
         </View>
       </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
+  scrollContent: { paddingTop: 4 },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12 },
   screenTitle: { fontFamily: 'InstrumentSerif_400Regular', fontSize: 28, color: colors.text },
 
