@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useCallback, useRef } from 'react';
 import { Plus, Wallet as WalletIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
@@ -90,6 +91,10 @@ function OnboardingView() {
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const pushing = useRef(false);
+
+  // Reset lock whenever this screen gains focus (sheet dismissed or back-navigated)
+  useFocusEffect(useCallback(() => { pushing.current = false; }, []));
 
   const { data: wallets, isLoading: walletsLoading } = useWallets();
   const { data: stats } = useMonthlyStats();
@@ -210,7 +215,11 @@ export default function HomeScreen() {
       {/* FAB */}
       <TouchableOpacity
         style={[styles.fab, { bottom: 84 + insets.bottom }]}
-        onPress={() => router.push('/(app)/quick-log')}
+        onPress={() => {
+          if (pushing.current) return;
+          pushing.current = true;
+          router.push('/(app)/quick-log');
+        }}
         activeOpacity={0.85}
       >
         <Plus size={28} color={colors.bg} strokeWidth={2.5} />
