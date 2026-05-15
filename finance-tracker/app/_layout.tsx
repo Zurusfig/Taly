@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, LogBox, AppState } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -21,6 +21,7 @@ import { queryClient } from '@/lib/queryClient';
 import { colors } from '@/theme/colors';
 import { LockScreen } from '@/components/LockScreen';
 import { getBiometricEnabled, authenticate } from '@/hooks/useBiometric';
+import { usePrefsStore } from '@/stores/prefsStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -96,6 +97,7 @@ function RootLayoutInner() {
   const router = useRouter();
   const segments = useSegments();
   const [locked, setLocked] = useState(false);
+  const hydrated = useRef(false);
 
   const ready = (fontsLoaded || !!fontError) && !authLoading;
 
@@ -117,6 +119,24 @@ function RootLayoutInner() {
     });
     return () => sub.remove();
   }, [session]);
+
+  // Hydrate prefs store once
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+    usePrefsStore.getState().hydrate();
+  }, []);
+
+  // Daily rollover: invalidate progress cache when app comes to foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        queryClient.invalidateQueries({ queryKey: ['user_progress'] });
+        queryClient.invalidateQueries({ queryKey: ['streak'] });
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // Hide splash once — not tied to navigation changes.
   useEffect(() => {

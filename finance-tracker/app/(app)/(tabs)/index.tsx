@@ -32,6 +32,9 @@ import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useYesterdaySnapshot, usePortfolioSnapshots } from '@/hooks/usePortfolioSnapshot';
 import { useStreak } from '@/hooks/useStreak';
 import { useReconciliation } from '@/hooks/useReconciliation';
+import { useProgress } from '@/hooks/useProgress';
+import { usePrefsStore } from '@/stores/prefsStore';
+import { CreatureCard } from '@/components/CreatureCard';
 import Svg, { Path } from 'react-native-svg';
 import { Flame } from 'lucide-react-native';
 
@@ -138,6 +141,8 @@ export default function HomeScreen() {
   const { data: yesterdaySnap } = useYesterdaySnapshot();
   const { data: recentSnapshots } = usePortfolioSnapshots('1W');
   const { data: streak } = useStreak();
+  const { data: progress } = useProgress();
+  const { minimalMode } = usePrefsStore();
   const hasCashWallet = (wallets ?? []).some((w) => w.type === 'cash');
   const { show: showReconcile, dismiss: dismissReconcile } = useReconciliation(hasCashWallet);
 
@@ -211,7 +216,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <Text style={styles.dateLabel}>{format(new Date(), 'MMMM yyyy')}</Text>
-            {(streak?.current ?? 0) > 0 && (
+            {!minimalMode && (streak?.current ?? 0) > 0 && (
               <View style={styles.streakBadge}>
                 <Flame size={13} color={(streak?.todayLogged) ? colors.warning : colors.textDim} />
                 <Text style={[styles.streakText, { color: streak?.todayLogged ? colors.warning : colors.textDim }]}>
@@ -250,6 +255,11 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
+
+        {/* Creature card */}
+        {!minimalMode && progress && (
+          <CreatureCard progress={progress} streak={streak} />
+        )}
 
         {/* Wallet cards */}
         <View style={styles.sectionHeader}>

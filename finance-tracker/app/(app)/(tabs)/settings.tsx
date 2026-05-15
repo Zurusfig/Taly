@@ -18,6 +18,8 @@ import {
   authenticate,
 } from '@/hooks/useBiometric';
 import { useStreak } from '@/hooks/useStreak';
+import { usePrefsStore } from '@/stores/prefsStore';
+import { Leaf } from 'lucide-react-native';
 
 function SettingsRow({
   icon, label, sublabel, onPress, destructive, loading,
@@ -75,6 +77,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { showOnHome, setShowOnHome } = usePortfolioStore();
   const { data: streak } = useStreak();
+  const { minimalMode, setMinimalMode } = usePrefsStore();
 
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
@@ -246,6 +249,19 @@ export default function SettingsScreen() {
           </View>
         </View>
       )}
+
+      <View style={styles.group}>
+        <Text style={styles.groupLabel}>Gamification</Text>
+        <View style={styles.card}>
+          <ToggleRow
+            icon={<Leaf size={18} color={colors.textMuted} />}
+            label="Minimal mode"
+            sublabel="Hide creature and streak chip"
+            value={minimalMode}
+            onValueChange={setMinimalMode}
+          />
+        </View>
+      </View>
 
       <View style={styles.group}>
         <Text style={styles.groupLabel}>Account</Text>
