@@ -96,17 +96,25 @@ function RootLayoutInner() {
 
   const ready = (fontsLoaded || !!fontError) && !authLoading;
 
+  // Hide splash once — not tied to navigation changes.
   useEffect(() => {
     if (!ready) return;
     SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
 
+  // Guard: redirect to/from auth only when session or readiness changes.
+  // Intentionally excludes `segments` from deps — sheet/modal navigation must not
+  // re-trigger this or it can race with Supabase token refresh and dismiss the sheet.
+  useEffect(() => {
+    if (!ready) return;
     const inAuth = segments[0] === '(auth)';
     if (!session && !inAuth) {
       router.replace('/(auth)/sign-in');
     } else if (session && inAuth) {
       router.replace('/(app)');
     }
-  }, [ready, session, segments]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, session]);
 
   if (!ready) return <View style={styles.bg} />;
 
