@@ -29,9 +29,11 @@ import { X } from 'lucide-react-native';
 import { useAutoLog } from '@/hooks/useAutoLog';
 import { useAssets } from '@/hooks/useAssets';
 import { usePortfolioStore } from '@/stores/portfolioStore';
-import { useYesterdaySnapshot } from '@/hooks/usePortfolioSnapshot';
+import { useYesterdaySnapshot, usePortfolioSnapshots } from '@/hooks/usePortfolioSnapshot';
+import { useStreak } from '@/hooks/useStreak';
+import { useReconciliation } from '@/hooks/useReconciliation';
 import Svg, { Path } from 'react-native-svg';
-import { usePortfolioSnapshots } from '@/hooks/usePortfolioSnapshot';
+import { Flame } from 'lucide-react-native';
 
 // ─── Onboarding ─────────────────────────────────────────────────────────────
 
@@ -135,6 +137,9 @@ export default function HomeScreen() {
   const { usdToThb, showOnHome } = usePortfolioStore();
   const { data: yesterdaySnap } = useYesterdaySnapshot();
   const { data: recentSnapshots } = usePortfolioSnapshots('1W');
+  const { data: streak } = useStreak();
+  const hasCashWallet = (wallets ?? []).some((w) => w.type === 'cash');
+  const { show: showReconcile, dismiss: dismissReconcile } = useReconciliation(hasCashWallet);
 
   const isLoading = walletsLoading;
   const hasWallets = (wallets?.length ?? 0) > 0;
@@ -189,9 +194,32 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Reconciliation banner */}
+        {showReconcile && (
+          <View style={styles.reconcileBanner}>
+            <View style={styles.reconcileContent}>
+              <Text style={styles.reconcileTitle}>Cash check</Text>
+              <Text style={styles.reconcileBody}>Does your cash wallet balance still look right?</Text>
+            </View>
+            <TouchableOpacity onPress={dismissReconcile} hitSlop={8}>
+              <X size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.dateLabel}>{format(new Date(), 'MMMM yyyy')}</Text>
+          <View style={styles.headerTop}>
+            <Text style={styles.dateLabel}>{format(new Date(), 'MMMM yyyy')}</Text>
+            {(streak?.current ?? 0) > 0 && (
+              <View style={styles.streakBadge}>
+                <Flame size={13} color={(streak?.todayLogged) ? colors.warning : colors.textDim} />
+                <Text style={[styles.streakText, { color: streak?.todayLogged ? colors.warning : colors.textDim }]}>
+                  {streak!.current}
+                </Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.totalBalance}>
             ฿{formatAmount(totalBalance)}
           </Text>
@@ -367,6 +395,23 @@ const styles = StyleSheet.create({
   onboardingForm: { width: '100%', gap: 12, marginTop: 8 },
   onboardingBtn: { marginTop: 4 },
 
+  // Reconciliation banner
+  reconcileBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: colors.bgElevated,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+    gap: 12,
+  },
+  reconcileContent: { flex: 1, gap: 2 },
+  reconcileTitle: { fontFamily: 'Inter_500Medium', fontSize: 13, color: colors.text },
+  reconcileBody: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textMuted },
+
   // Header
   header: {
     paddingHorizontal: 24,
@@ -374,12 +419,31 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 6,
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   dateLabel: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.bgElevated,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  streakText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
   },
   totalBalance: {
     fontFamily: 'InstrumentSerif_400Regular',

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, StyleSheet, LogBox } from 'react-native';
+import { View, StyleSheet, LogBox, AppState } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -19,6 +19,8 @@ import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
 import { colors } from '@/theme/colors';
+import { LockScreen } from '@/components/LockScreen';
+import { getBiometricEnabled, authenticate } from '@/hooks/useBiometric';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -93,8 +95,28 @@ function RootLayoutInner() {
   const { session, loading: authLoading } = useAuthSession();
   const router = useRouter();
   const segments = useSegments();
+  const [locked, setLocked] = useState(false);
 
   const ready = (fontsLoaded || !!fontError) && !authLoading;
+
+  // Biometric gate: check on ready + re-lock when app comes back to foreground
+  useEffect(() => {
+    if (!ready || !session) return;
+    getBiometricEnabled().then((enabled) => {
+      if (enabled) setLocked(true);
+    });
+  }, [ready, session]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && session) {
+        getBiometricEnabled().then((enabled) => {
+          if (enabled) setLocked(true);
+        });
+      }
+    });
+    return () => sub.remove();
+  }, [session]);
 
   // Hide splash once — not tied to navigation changes.
   useEffect(() => {
@@ -117,6 +139,10 @@ function RootLayoutInner() {
   }, [ready, session]);
 
   if (!ready) return <View style={styles.bg} />;
+
+  if (locked && session) {
+    return <LockScreen onUnlock={() => setLocked(false)} />;
+  }
 
   return (
     <View style={styles.bg}>
