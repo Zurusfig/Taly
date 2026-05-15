@@ -25,6 +25,8 @@ import { seedDefaultCategories } from '@/hooks/useCategories';
 import { useCreateWallet } from '@/hooks/useWallets';
 import { Input } from '@/components/ui/Input';
 import { useState } from 'react';
+import { X } from 'lucide-react-native';
+import { useAutoLog } from '@/hooks/useAutoLog';
 
 // ─── Onboarding ─────────────────────────────────────────────────────────────
 
@@ -92,6 +94,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const pushing = useRef(false);
+  const { logged: autoLogged, dismiss: dismissAutoLog } = useAutoLog();
 
   // Reset lock whenever this screen gains focus (sheet dismissed or back-navigated)
   useFocusEffect(useCallback(() => { pushing.current = false; }, []));
@@ -128,6 +131,23 @@ export default function HomeScreen() {
   return (
     <View style={[styles.flex, { paddingTop: insets.top }]}>
       <ScrollView style={styles.flex} showsVerticalScrollIndicator={false}>
+        {/* Auto-log banner */}
+        {autoLogged.length > 0 && (
+          <View style={styles.autoLogBanner}>
+            <View style={styles.autoLogContent}>
+              <Text style={styles.autoLogTitle}>
+                Auto-logged {autoLogged.reduce((s, e) => s + e.count, 0)} subscription{autoLogged.reduce((s, e) => s + e.count, 0) !== 1 ? 's' : ''}
+              </Text>
+              <Text style={styles.autoLogBody} numberOfLines={1}>
+                {autoLogged.map((e) => e.name).join(', ')}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={dismissAutoLog} hitSlop={8}>
+              <X size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.dateLabel}>{format(new Date(), 'MMMM yyyy')}</Text>
@@ -335,6 +355,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textDim,
     textAlign: 'center',
+  },
+
+  // Auto-log banner
+  autoLogBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: colors.bgElevated,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+    gap: 12,
+  },
+  autoLogContent: { flex: 1, gap: 2 },
+  autoLogTitle: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: colors.text,
+  },
+  autoLogBody: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: colors.textMuted,
   },
 
   // FAB

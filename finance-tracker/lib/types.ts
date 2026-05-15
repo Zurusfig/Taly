@@ -46,3 +46,19 @@ export interface MonthlyStats {
   expense: number;
   net: number;
 }
+
+export type SubscriptionCycle = 'weekly' | 'monthly' | 'yearly';
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  name: string;
+  amount: number;
+  wallet_id: string;
+  category_id: string | null;
+  cycle: SubscriptionCycle;
+  cycle_anchor_date: string;
+  next_charge_date: string;
+  active: boolean;
+  created_at: string;
+}
