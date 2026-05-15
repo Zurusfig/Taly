@@ -337,7 +337,6 @@ export default function HomeScreen() {
             progress={progress}
             streak={streak}
             completion={todayCompletion}
-            showPetals={!minimalMode}
             onHarvest={() => {
               const species = (progress as any).active_plant_species ?? 'sprout';
               harvestPlant.mutate({

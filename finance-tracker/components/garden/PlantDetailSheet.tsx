@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { differenceInDays } from 'date-fns';
 import { colors } from '@/theme/colors';
 import { Creature } from '@/components/Creature';
-import { PETAL_DESCRIPTIONS } from './Petals';
+import { DROPLET_DESCRIPTIONS } from './WaterDroplets';
 import { xpToStage, nextStageXp, moodFromLastLogged, type UserProgress } from '@/hooks/useProgress';
 import type { DailyCompletion } from '@/hooks/useDailyCompletions';
 import type { StreakInfo } from '@/hooks/useStreak';
@@ -61,7 +61,6 @@ export function PlantDetailSheet({
               <X size={18} color={colors.textMuted} />
             </TouchableOpacity>
 
-            {/* Plant illustration */}
             <View style={styles.plantWrap}>
               <Creature stage={stage} mood={mood} size={160} species={species} />
             </View>
@@ -69,34 +68,32 @@ export function PlantDetailSheet({
             <Text style={styles.speciesName}>{capitalize(species)}</Text>
             <Text style={styles.dayLabel}>Day {daysGrowing} of growth</Text>
 
-            {/* Growth bar */}
             <View style={styles.growthBarBg}>
               <View style={[styles.growthBarFill, { width: `${Math.round(pct * 100)}%` }]} />
             </View>
 
             <Text style={styles.moodText}>{moodText[mood]}</Text>
 
-            {/* Petal status */}
-            <View style={styles.petalSection}>
-              <Text style={styles.petalTitle}>Today's petals</Text>
-              <PetalRow
+            {/* Watering status */}
+            <View style={styles.dropletSection}>
+              <Text style={styles.dropletTitle}>Today's watering</Text>
+              <DropletRow
                 label="Capture"
                 done={completion?.capture_done ?? false}
-                description={PETAL_DESCRIPTIONS.capture}
+                description={DROPLET_DESCRIPTIONS.capture}
               />
-              <PetalRow
+              <DropletRow
                 label="Awareness"
                 done={completion?.awareness_done ?? false}
-                description={PETAL_DESCRIPTIONS.awareness}
+                description={DROPLET_DESCRIPTIONS.awareness}
               />
-              <PetalRow
+              <DropletRow
                 label="Discipline"
                 done={completion?.discipline_done ?? false}
-                description={PETAL_DESCRIPTIONS.discipline}
+                description={DROPLET_DESCRIPTIONS.discipline}
               />
             </View>
 
-            {/* Streak */}
             {(streak?.current ?? 0) > 0 && (
               <View style={styles.streakRow}>
                 <Text style={styles.streakLabel}>
@@ -105,7 +102,6 @@ export function PlantDetailSheet({
               </View>
             )}
 
-            {/* Harvest */}
             {canHarvest && (
               <TouchableOpacity style={styles.harvestBtn} onPress={handleHarvest} activeOpacity={0.8}>
                 <Leaf size={16} color={colors.bg} />
@@ -122,13 +118,13 @@ export function PlantDetailSheet({
   );
 }
 
-function PetalRow({ label, done, description }: { label: string; done: boolean; description: string }) {
+function DropletRow({ label, done, description }: { label: string; done: boolean; description: string }) {
   return (
-    <View style={styles.petalRow}>
-      <View style={[styles.petalDot, done && styles.petalDotDone]} />
-      <View style={styles.petalRowText}>
-        <Text style={[styles.petalRowLabel, done && styles.petalRowDone]}>{label}</Text>
-        <Text style={styles.petalRowDesc}>{description}</Text>
+    <View style={styles.dropletRow}>
+      <View style={[styles.dropletDot, done && styles.dropletDotDone]} />
+      <View style={styles.dropletRowText}>
+        <Text style={[styles.dropletRowLabel, done && styles.dropletRowDone]}>{label}</Text>
+        <Text style={styles.dropletRowDesc}>{description}</Text>
       </View>
     </View>
   );
@@ -198,30 +194,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  petalSection: { gap: 12, marginBottom: 24 },
-  petalTitle: {
+  dropletSection: { gap: 12, marginBottom: 24 },
+  dropletTitle: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
     color: colors.textDim,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
-  petalRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  petalDot: {
+  dropletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  dropletDot: {
     width: 10, height: 10, borderRadius: 5,
     backgroundColor: colors.bgInput,
     borderWidth: 1, borderColor: colors.border,
     marginTop: 3,
   },
-  petalDotDone: { backgroundColor: colors.accent, borderColor: colors.accent },
-  petalRowText: { flex: 1, gap: 2 },
-  petalRowLabel: {
+  dropletDotDone: { backgroundColor: colors.accent, borderColor: colors.accent },
+  dropletRowText: { flex: 1, gap: 2 },
+  dropletRowLabel: {
     fontFamily: 'Inter_500Medium',
     fontSize: 14,
     color: colors.textMuted,
   },
-  petalRowDone: { color: colors.text },
-  petalRowDesc: {
+  dropletRowDone: { color: colors.text },
+  dropletRowDesc: {
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
     color: colors.textDim,

@@ -292,16 +292,33 @@ Run the SQL in `supabase/migrations/20260515_portfolio_snapshots.sql` in the Sup
 - `sleepy` — logged 2 days ago → slight SVG droop (5°)
 - `hungry` — not logged in 3+ days → more droop (10°)
 
+### Water Droplet Completion Indicator
+The three-petal overlay was replaced with three water droplets rendered **above** the plant illustration in `CreatureCard`. This is the "watering" metaphor: fill all three droplets to water your plant each day.
+
+- Droplet 1 — **Capture**: logged a transaction or marked no-spend today
+- Droplet 2 — **Awareness**: opened Summary, Portfolio, or Net Worth today
+- Droplet 3 — **Discipline**: on budget pace, or fast-log rate ≥ 50% today
+
+Filled = accent color with 500ms ease-out fill + pulse. Empty = textMuted outline.
+
+**All-three-filled moment**: 200ms pause → droplets fall toward plant (450ms) → plant bounce + accent glow halo (~600ms) → haptic success → toast "Your plant has been watered" (2s).
+
+**Tap any droplet** → tooltip explains what fills it (2.5s auto-dismiss).
+
+**Minimal mode**: `CreatureCard` is not rendered at all (droplets hidden with it).
+
 ### Key Files
 - `supabase/migrations/20260515_user_progress.sql` — user_progress table (xp, last_logged_date) + RLS
 - `stores/prefsStore.ts` — minimalMode Zustand store with SecureStore persistence
 - `hooks/useProgress.ts` — fetch/create user_progress, `applyTransactionXp()`, `xpToStage()`, `moodFromLastLogged()`
 - `components/Creature.tsx` — SVG plant, 5 stages × 4 moods, reanimated sway for happy mood
-- `components/CreatureCard.tsx` — home card: creature (120×120) + stage label + XP bar + streak chip
+- `components/CreatureCard.tsx` — home card: WaterDroplets above plant (90px) + info column + XP bar + streak chip
+- `components/garden/WaterDroplets.tsx` — three Droplet icons, fill animations, fall-and-water celebration, tap tooltips
+- `components/garden/PlantDetailSheet.tsx` — modal with "Today's watering" section (replaces petals)
 
 ### Minimal Mode
 - Toggle in Settings → Gamification section
-- Hides CreatureCard on home and streak chip in header
+- Hides entire CreatureCard on home (droplets hidden with it) and streak chip in header
 - Fast-log Zap icon on TransactionItem is always visible (not affected by minimal mode)
 - Persisted via SecureStore, hydrated in `app/_layout.tsx` on mount
 

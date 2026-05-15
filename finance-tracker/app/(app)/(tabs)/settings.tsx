@@ -256,7 +256,7 @@ export default function SettingsScreen() {
           <ToggleRow
             icon={<Leaf size={18} color={colors.textMuted} />}
             label="Minimal mode"
-            sublabel="Hide petals, Sunday cards, quest nudges, and celebration animations"
+            sublabel="Hide droplets, Sunday cards, quest nudges, and celebration animations"
             value={minimalMode}
             onValueChange={setMinimalMode}
           />
