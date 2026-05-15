@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, LogBox, AppState } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -177,9 +178,11 @@ function RootLayoutInner() {
 
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <RootLayoutInner />
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <RootLayoutInner />
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
 
