@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { useEffect, useState, useRef } from 'react';
+import { View, StyleSheet, LogBox, AppState } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -19,8 +19,20 @@ import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
 import { colors } from '@/theme/colors';
+import { LockScreen } from '@/components/LockScreen';
+import { getBiometricEnabled, authenticate } from '@/hooks/useBiometric';
+import { usePrefsStore } from '@/stores/prefsStore';
 
 SplashScreen.preventAutoHideAsync();
+
+// Expo Router calls SplashScreen.hideAsync() for every new view controller it opens
+// (sheets, modals, etc.), but the splash was only registered on the root controller.
+// Patch hideAsync so every caller — including Expo Router internals — silently swallows
+// the "No native splash screen registered" rejection instead of surfacing it.
+const _origHide = SplashScreen.hideAsync;
+SplashScreen.hideAsync = () => _origHide().catch(() => {});
+
+LogBox.ignoreLogs(['No native splash screen registered']);
 
 function useAuthSession() {
   const [session, setSession] = useState<Session | null>(null);
@@ -84,22 +96,73 @@ function RootLayoutInner() {
   const { session, loading: authLoading } = useAuthSession();
   const router = useRouter();
   const segments = useSegments();
+  const [locked, setLocked] = useState(false);
+  const hydrated = useRef(false);
 
   const ready = (fontsLoaded || !!fontError) && !authLoading;
 
+  // Biometric gate: check on ready + re-lock when app comes back to foreground
+  useEffect(() => {
+    if (!ready || !session) return;
+    getBiometricEnabled().then((enabled) => {
+      if (enabled) setLocked(true);
+    });
+  }, [ready, session]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && session) {
+        getBiometricEnabled().then((enabled) => {
+          if (enabled) setLocked(true);
+        });
+      }
+    });
+    return () => sub.remove();
+  }, [session]);
+
+  // Hydrate prefs store once
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+    usePrefsStore.getState().hydrate();
+  }, []);
+
+  // Daily rollover: invalidate progress cache when app comes to foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        queryClient.invalidateQueries({ queryKey: ['user_progress'] });
+        queryClient.invalidateQueries({ queryKey: ['streak'] });
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Hide splash once — not tied to navigation changes.
   useEffect(() => {
     if (!ready) return;
     SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
 
+  // Guard: redirect to/from auth only when session or readiness changes.
+  // Intentionally excludes `segments` from deps — sheet/modal navigation must not
+  // re-trigger this or it can race with Supabase token refresh and dismiss the sheet.
+  useEffect(() => {
+    if (!ready) return;
     const inAuth = segments[0] === '(auth)';
     if (!session && !inAuth) {
       router.replace('/(auth)/sign-in');
     } else if (session && inAuth) {
       router.replace('/(app)');
     }
-  }, [ready, session, segments]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, session]);
 
   if (!ready) return <View style={styles.bg} />;
+
+  if (locked && session) {
+    return <LockScreen onUnlock={() => setLocked(false)} />;
+  }
 
   return (
     <View style={styles.bg}>

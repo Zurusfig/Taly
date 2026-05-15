@@ -242,16 +242,68 @@ For each period show:
 - Subscription CRUD
 - Auto-log on cycle date
 
-### Phase 4 — Assets
-- Asset CRUD
-- Supabase Edge Function for price refresh
-- Portfolio card on home
+### Phase 4 — Assets (complete)
+- Asset CRUD with symbol search (Stock/ETF via Finnhub /search)
+- Portfolio tab in bottom nav (between Transactions and Summary)
+- Edge Functions: `refresh-prices` (Finnhub quotes + USD/THB rate), `search-symbols` (Finnhub search)
+- `portfolio_snapshots` table — daily snapshots, see migration at `supabase/migrations/20260515_portfolio_snapshots.sql`
+- Portfolio screen: header with total + day change, area chart (PortfolioChart), holdings list with sort, currency toggle (USD/THB/Both) persisted in Zustand
+- Net worth screen (`/(app)/net-worth`) — wallets + portfolio, donut chart with expand toggle
+- Home portfolio card with inline sparkline + day change + net worth link
+- Auto-refresh on app open when last refresh > 15 min AND market hours (9:30–16:00 ET weekdays)
+- Snapshot taken after each successful price refresh
+- `stores/portfolioStore.ts` — `CurrencyMode`, `TimeRange`, `usdToThb`, `shouldAutoRefresh()`, `isMarketHours()`
 
-### Phase 5 — Polish
+### Edge Function deployment (one-time)
+```bash
+cd finance-tracker
+npx supabase@latest functions deploy refresh-prices
+npx supabase@latest functions deploy search-symbols
+npx supabase@latest secrets set FINNHUB_API_KEY=<key>
+```
+Or set the secret via Supabase Dashboard → Settings → Edge Functions → Secrets.
+Run the SQL in `supabase/migrations/20260515_portfolio_snapshots.sql` in the Supabase SQL editor.
+
+### Phase 5 — Polish (complete)
 - JSON export/import
 - Biometric lock
-- Gamification: streak counter (consecutive days with ≥1 log), weekly goal badge
+- Gamification: streak counter + plant creature (see below)
 - Cash reconciliation weekly prompt
+
+## Gamification System
+
+### XP Rules
+- +5 XP per transaction logged
+- +5 bonus XP if fast-logged (|created_at − occurred_at| ≤ 5 min)
+- Applied in `useCreateTransaction` via `applyTransactionXp(occurred_at)`
+
+### Creature Stages (plant metaphor)
+| Stage | Name | XP Required |
+|-------|------|-------------|
+| 1 | Sprout | 0 |
+| 2 | Seedling | 50 |
+| 3 | Budding | 200 |
+| 4 | Blooming | 500 |
+| 5 | Flourishing | 1500 |
+
+### Moods (derived from last_logged_date)
+- `happy` — logged today → gentle reanimated sway (±2°, 3s cycle)
+- `neutral` — logged yesterday
+- `sleepy` — logged 2 days ago → slight SVG droop (5°)
+- `hungry` — not logged in 3+ days → more droop (10°)
+
+### Key Files
+- `supabase/migrations/20260515_user_progress.sql` — user_progress table (xp, last_logged_date) + RLS
+- `stores/prefsStore.ts` — minimalMode Zustand store with SecureStore persistence
+- `hooks/useProgress.ts` — fetch/create user_progress, `applyTransactionXp()`, `xpToStage()`, `moodFromLastLogged()`
+- `components/Creature.tsx` — SVG plant, 5 stages × 4 moods, reanimated sway for happy mood
+- `components/CreatureCard.tsx` — home card: creature (120×120) + stage label + XP bar + streak chip
+
+### Minimal Mode
+- Toggle in Settings → Gamification section
+- Hides CreatureCard on home and streak chip in header
+- Fast-log Zap icon on TransactionItem is always visible (not affected by minimal mode)
+- Persisted via SecureStore, hydrated in `app/_layout.tsx` on mount
 
 ## Default Seeds
 

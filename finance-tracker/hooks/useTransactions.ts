@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { startOfMonth, endOfMonth } from '@/lib/utils';
 import type { Transaction, MonthlyStats, TransactionType } from '@/lib/types';
+import { applyTransactionXp } from './useProgress';
 
 export const TX_KEY = ['transactions'] as const;
 
@@ -90,11 +91,14 @@ export function useCreateTransaction() {
       };
       const { data, error } = await supabase.from('transactions').insert(payload).select().single();
       if (error) throw error;
+      applyTransactionXp(payload.occurred_at).catch(() => {});
       return data as Transaction;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: TX_KEY });
       qc.invalidateQueries({ queryKey: ['wallets'] });
+      qc.invalidateQueries({ queryKey: ['user_progress'] });
+      qc.invalidateQueries({ queryKey: ['streak'] });
     },
   });
 }

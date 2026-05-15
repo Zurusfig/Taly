@@ -21,6 +21,15 @@ export default function AppLayout() {
       <Stack.Screen name="categories/index" />
       <Stack.Screen name="categories/new" />
       <Stack.Screen name="categories/[id]" />
+      <Stack.Screen name="budgets/index" />
+      <Stack.Screen name="budgets/new" />
+      <Stack.Screen name="budgets/[id]" />
+      <Stack.Screen name="subscriptions/index" />
+      <Stack.Screen name="subscriptions/new" />
+      <Stack.Screen name="subscriptions/[id]" />
+      <Stack.Screen name="assets/new" />
+      <Stack.Screen name="assets/[id]" />
+      <Stack.Screen name="net-worth" />
     </Stack>
   );
 }

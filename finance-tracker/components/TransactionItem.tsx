@@ -1,8 +1,17 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Zap } from 'lucide-react-native';
 import { colors } from '@/theme/colors';
 import { formatCurrency, formatTransactionDate, amountColor, amountPrefix } from '@/lib/utils';
 import type { Transaction } from '@/lib/types';
 import type { Category, Wallet } from '@/lib/types';
+
+function isFastLog(tx: Transaction): boolean {
+  if (!tx.created_at) return false;
+  const diffMin = Math.abs(
+    new Date(tx.created_at).getTime() - new Date(tx.occurred_at).getTime()
+  ) / 60_000;
+  return diffMin <= 5;
+}
 
 interface TransactionItemProps {
   tx: Transaction;
@@ -16,6 +25,7 @@ export function TransactionItem({ tx, category, wallet, toWallet, onPress }: Tra
   const aColor = amountColor(tx.type);
   const prefix = amountPrefix(tx.type);
   const dotColor = category?.color ?? colors.border;
+  const fastLog = isFastLog(tx);
 
   const label =
     tx.type === 'transfer'
@@ -33,7 +43,10 @@ export function TransactionItem({ tx, category, wallet, toWallet, onPress }: Tra
         <Text style={[styles.amount, { color: aColor }]}>
           {prefix}{formatCurrency(tx.amount, wallet?.currency)}
         </Text>
-        <Text style={styles.date}>{formatTransactionDate(tx.occurred_at)}</Text>
+        <View style={styles.dateRow}>
+          {fastLog && <Zap size={10} color={colors.warning} fill={colors.warning} />}
+          <Text style={styles.date}>{formatTransactionDate(tx.occurred_at)}</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -64,6 +77,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   right: { alignItems: 'flex-end', gap: 2 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   amount: {
     fontFamily: 'InstrumentSerif_400Regular',
     fontSize: 16,
