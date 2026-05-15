@@ -190,6 +190,13 @@ export default function HomeScreen() {
   const txCount = recentTxs?.length ?? 0;
   const showLongPressHint = !minimalMode && !hintDismissed && !hintLocallyDismissed && txCount >= 3 && !showFabMenu;
 
+  // Auto-dismiss hint after 4s
+  useEffect(() => {
+    if (!showLongPressHint) return;
+    const t = setTimeout(() => setHintLocallyDismissed(true), 4000);
+    return () => clearTimeout(t);
+  }, [showLongPressHint]);
+
   async function dismissHint() {
     setHintLocallyDismissed(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -451,7 +458,7 @@ export default function HomeScreen() {
       {/* Long-press onboarding hint */}
       {showLongPressHint && (
         <TouchableOpacity
-          style={[styles.hintBubble, { bottom: 84 + insets.bottom + 90 }]}
+          style={[styles.hintBubble, { bottom: 84 + insets.bottom + 78 }]}
           onPress={dismissHint}
           activeOpacity={0.8}
         >
