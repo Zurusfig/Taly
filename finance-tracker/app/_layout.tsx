@@ -22,8 +22,13 @@ import { colors } from '@/theme/colors';
 
 SplashScreen.preventAutoHideAsync();
 
-// Expo fires SplashScreen.hideAsync() for every view controller (including sheets/modals),
-// but the splash was only shown for the root controller. Suppress the spurious native error.
+// Expo Router calls SplashScreen.hideAsync() for every new view controller it opens
+// (sheets, modals, etc.), but the splash was only registered on the root controller.
+// Patch hideAsync so every caller — including Expo Router internals — silently swallows
+// the "No native splash screen registered" rejection instead of surfacing it.
+const _origHide = SplashScreen.hideAsync;
+SplashScreen.hideAsync = () => _origHide().catch(() => {});
+
 LogBox.ignoreLogs(['No native splash screen registered']);
 
 function useAuthSession() {
