@@ -1,23 +1,22 @@
-import { useState, Fragment } from 'react';
+import { useState, useRef, useCallback, Fragment } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  Modal,
-  FlatList,
-  LogBox,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  Alert, Modal, FlatList, LogBox,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  runOnJS,
+} from 'react-native-reanimated';
 import { X } from 'lucide-react-native';
 import { colors } from '@/theme/colors';
 import { currencySymbol, formatAmount } from '@/lib/utils';
 import { NumPad, useNumPadAmount } from '@/components/ui/NumPad';
-import { Button } from '@/components/ui/Button';
 import { PillButton } from '@/components/ui/PillButton';
 import { useWallets } from '@/hooks/useWallets';
 import { useCategories } from '@/hooks/useCategories';
@@ -103,6 +102,99 @@ function TypeToggle({ value, onChange }: { value: TransactionType; onChange: (t:
   );
 }
 
+// ─── Drag Save Button ─────────────────────────────────────────────────────────
+
+const DRAG_MAX = -100;   // px upward for 100% threshold
+const DRAG_WARN = DRAG_MAX * 0.6;
+const DRAG_COMMIT = DRAG_MAX;
+
+interface DragSaveButtonProps {
+  onSave: () => Promise<void>;
+  loading: boolean;
+  typeColor: string;
+  hasDiscovered: boolean;
+  onDiscovered: () => void;
+}
+
+function DragSaveButton({ onSave, loading, typeColor, hasDiscovered, onDiscovered }: DragSaveButtonProps) {
+  const dragY = useSharedValue(0);
+  const warnedRef = useRef(false);
+  const committedRef = useRef(false);
+
+  function triggerWarn() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }
+
+  function triggerCommit() {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (!hasDiscovered) onDiscovered();
+    onSave().catch(() => {});
+  }
+
+  const panGesture = Gesture.Pan()
+    .onUpdate((e) => {
+      if (e.translationY >= 0) {
+        dragY.value = 0;
+        return;
+      }
+      dragY.value = Math.max(e.translationY, DRAG_MAX * 1.05);
+      // Warn haptic at 60%
+      if (dragY.value <= DRAG_WARN && !warnedRef.current) {
+        warnedRef.current = true;
+        runOnJS(triggerWarn)();
+      }
+      if (dragY.value > DRAG_WARN) {
+        warnedRef.current = false;
+      }
+    })
+    .onEnd(() => {
+      if (dragY.value <= DRAG_COMMIT) {
+        committedRef.current = true;
+        runOnJS(triggerCommit)();
+      }
+      dragY.value = withSpring(0, { damping: 18, stiffness: 220 });
+      warnedRef.current = false;
+      committedRef.current = false;
+    });
+
+  const tapGesture = Gesture.Tap().onEnd(() => {
+    runOnJS(onSave)();
+  });
+
+  const gesture = Gesture.Race(panGesture, tapGesture);
+
+  // Pill stretches upward: translateY follows drag, height grows
+  const pillStyle = useAnimatedStyle(() => {
+    const progress = Math.min(Math.abs(dragY.value) / Math.abs(DRAG_MAX), 1);
+    return {
+      transform: [{ translateY: dragY.value * 0.4 }],
+      paddingTop: 14 + progress * 8,
+    };
+  });
+
+  // Hint arrow (pulsing, only shown before first discovery)
+  const hintOpacity = useSharedValue(hasDiscovered ? 0 : 0.7);
+
+  const hintStyle = useAnimatedStyle(() => ({ opacity: hintOpacity.value }));
+
+  return (
+    <View>
+      {!hasDiscovered && (
+        <Animated.View style={[styles.dragHint, hintStyle]}>
+          <Text style={styles.dragHintText}>↑</Text>
+        </Animated.View>
+      )}
+      <GestureDetector gesture={gesture}>
+        <Animated.View
+          style={[styles.saveBtn, { backgroundColor: loading ? colors.textDim : typeColor }, pillStyle]}
+        >
+          <Text style={styles.saveBtnText}>{loading ? '…' : 'Save'}</Text>
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
+}
+
 // ─── Main Sheet ───────────────────────────────────────────────────────────────
 
 export default function QuickLog() {
@@ -120,6 +212,7 @@ export default function QuickLog() {
   const [showWalletPicker, setShowWalletPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showToWalletPicker, setShowToWalletPicker] = useState(false);
+  const [dragDiscovered, setDragDiscovered] = useState(false);
 
   const handleKey = useNumPadAmount();
 
@@ -136,7 +229,7 @@ export default function QuickLog() {
   const effectiveCategoryId = type !== 'transfer' ? (activeCategory?.id ?? null) : null;
   const effectiveToWalletId = type === 'transfer' ? (activeToWallet?.id ?? null) : null;
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     if (amount <= 0) { Alert.alert('Enter an amount'); return; }
     if (!effectiveWalletId) { Alert.alert('Select a wallet'); return; }
     if (type === 'transfer' && !effectiveToWalletId) { Alert.alert('Select a destination wallet'); return; }
@@ -154,7 +247,7 @@ export default function QuickLog() {
     } catch (e: any) {
       Alert.alert('Error', e.message);
     }
-  }
+  }, [amount, effectiveWalletId, type, effectiveToWalletId, effectiveCategoryId, note, createTx]);
 
   return (
     <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
@@ -206,11 +299,12 @@ export default function QuickLog() {
         <NumPad onKey={(key) => setAmountStr((prev) => handleKey(prev, key))} />
       </View>
 
-      <Button
-        label="Save"
-        onPress={handleSave}
+      <DragSaveButton
+        onSave={handleSave}
         loading={createTx.isPending}
-        style={[styles.saveBtn, { backgroundColor: typeColor }]}
+        typeColor={typeColor}
+        hasDiscovered={dragDiscovered}
+        onDiscovered={() => setDragDiscovered(true)}
       />
 
       <PickerModal
@@ -250,9 +344,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
+    width: 36, height: 4, borderRadius: 2,
     backgroundColor: colors.border,
     alignSelf: 'center',
     marginBottom: 4,
@@ -274,13 +366,30 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   numpad: { flex: 1 },
-  saveBtn: { marginTop: 4 },
+  saveBtn: {
+    borderRadius: 14,
+    paddingBottom: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 17,
+    color: colors.bg,
+  },
+  dragHint: {
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  dragHintText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: colors.textDim,
+  },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   pickerSheet: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    bottom: 0, left: 0, right: 0,
     backgroundColor: colors.bgElevated,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

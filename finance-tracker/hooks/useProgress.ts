@@ -7,6 +7,9 @@ export interface UserProgress {
   user_id: string;
   xp: number;
   last_logged_date: string | null;
+  created_at: string;
+  active_plant_species: string;
+  active_plant_planted_at: string | null;
 }
 
 export type CreatureStage = 1 | 2 | 3 | 4 | 5;
@@ -104,7 +107,13 @@ export async function applyTransactionXp(occurredAt: string) {
   } else {
     await supabase
       .from('user_progress')
-      .insert({ user_id: user.id, xp: xpGain, last_logged_date: today });
+      .insert({
+        user_id: user.id,
+        xp: xpGain,
+        last_logged_date: today,
+        active_plant_species: 'sprout',
+        active_plant_planted_at: new Date().toISOString(),
+      });
   }
 }
 

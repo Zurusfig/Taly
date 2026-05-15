@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { Plus, Wallet as WalletIcon, TrendingUp, TrendingDown } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
@@ -26,6 +26,7 @@ import { useCreateWallet } from '@/hooks/useWallets';
 import { Input } from '@/components/ui/Input';
 import { useState } from 'react';
 import { X } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { useAutoLog } from '@/hooks/useAutoLog';
 import { useAssets } from '@/hooks/useAssets';
 import { usePortfolioStore } from '@/stores/portfolioStore';
@@ -35,8 +36,14 @@ import { useReconciliation } from '@/hooks/useReconciliation';
 import { useProgress } from '@/hooks/useProgress';
 import { usePrefsStore } from '@/stores/prefsStore';
 import { CreatureCard } from '@/components/CreatureCard';
+import { InsightCard } from '@/components/garden/InsightCard';
+import { useTodayCompletion } from '@/hooks/useDailyCompletions';
+import { useTodayNoSpendDay, useMarkNoSpendDay } from '@/hooks/useNoSpendDays';
+import { useThisSundayInsight, useGenerateSundayInsight, useDismissInsight } from '@/hooks/useWeeklyInsights';
+import { useHarvestPlant } from '@/hooks/useGarden';
 import Svg, { Path } from 'react-native-svg';
-import { Flame } from 'lucide-react-native';
+import { Flame, Leaf } from 'lucide-react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
 // ─── Onboarding ─────────────────────────────────────────────────────────────
 
@@ -144,6 +151,23 @@ export default function HomeScreen() {
   const { data: progress } = useProgress();
   const { minimalMode } = usePrefsStore();
   const hasCashWallet = (wallets ?? []).some((w) => w.type === 'cash');
+  const { data: todayCompletion } = useTodayCompletion();
+  const { data: todayNoSpend } = useTodayNoSpendDay();
+  const markNoSpend = useMarkNoSpendDay();
+  const { data: sundayInsight } = useThisSundayInsight();
+  const generateInsight = useGenerateSundayInsight();
+  const dismissInsight = useDismissInsight();
+  const harvestPlant = useHarvestPlant();
+  const [showFabMenu, setShowFabMenu] = useState(false);
+  const fabScale = useSharedValue(1);
+
+  useEffect(() => {
+    generateInsight.mutate();
+  }, []);
+
+  const fabStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: fabScale.value }],
+  }));
   const { show: showReconcile, dismiss: dismissReconcile } = useReconciliation(hasCashWallet);
 
   const isLoading = walletsLoading;
@@ -256,9 +280,29 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Sunday insight card */}
+        {!minimalMode && sundayInsight && !sundayInsight.seen && (
+          <InsightCard
+            insight={sundayInsight}
+            onDismiss={() => dismissInsight.mutate(sundayInsight.id)}
+          />
+        )}
+
         {/* Creature card */}
         {!minimalMode && progress && (
-          <CreatureCard progress={progress} streak={streak} />
+          <CreatureCard
+            progress={progress}
+            streak={streak}
+            completion={todayCompletion}
+            showPetals={!minimalMode}
+            onHarvest={() => {
+              const species = (progress as any).active_plant_species ?? 'sprout';
+              harvestPlant.mutate({
+                species,
+                originLabel: `Stage 5 plant harvested`,
+              });
+            }}
+          />
         )}
 
         {/* Wallet cards */}
@@ -361,18 +405,72 @@ export default function HomeScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
+      {/* FAB long-press menu */}
+      {showFabMenu && (
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={() => setShowFabMenu(false)}
+        />
+      )}
+      {showFabMenu && (
+        <View style={[styles.fabMenu, { bottom: 84 + insets.bottom + 64 }]}>
+          <TouchableOpacity
+            style={styles.fabMenuItem}
+            onPress={() => {
+              setShowFabMenu(false);
+              if (pushing.current) return;
+              pushing.current = true;
+              router.push('/(app)/quick-log');
+            }}
+            activeOpacity={0.8}
+          >
+            <Plus size={16} color={colors.text} />
+            <Text style={styles.fabMenuText}>Log expense</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.fabMenuItem,
+              (todayNoSpend != null) && styles.fabMenuItemDisabled,
+            ]}
+            onPress={() => {
+              if (todayNoSpend != null) return;
+              setShowFabMenu(false);
+              markNoSpend.mutate();
+            }}
+            activeOpacity={0.8}
+            disabled={todayNoSpend != null}
+          >
+            <Leaf size={16} color={todayNoSpend != null ? colors.textDim : colors.accent} />
+            <Text style={[styles.fabMenuText, todayNoSpend != null && { color: colors.textDim }]}>
+              {todayNoSpend != null ? 'No-spend marked' : 'No-spend day'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { bottom: 84 + insets.bottom }]}
-        onPress={() => {
-          if (pushing.current) return;
-          pushing.current = true;
-          router.push('/(app)/quick-log');
-        }}
-        activeOpacity={0.85}
-      >
-        <Plus size={28} color={colors.bg} strokeWidth={2.5} />
-      </TouchableOpacity>
+      <Animated.View style={[styles.fabWrap, { bottom: 84 + insets.bottom }, fabStyle]}>
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => {
+            if (showFabMenu) { setShowFabMenu(false); return; }
+            if (pushing.current) return;
+            pushing.current = true;
+            router.push('/(app)/quick-log');
+          }}
+          onLongPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            fabScale.value = withSpring(1.12, { damping: 10, stiffness: 300 });
+            setTimeout(() => { fabScale.value = withSpring(1); }, 200);
+            setShowFabMenu(true);
+          }}
+          delayLongPress={500}
+          activeOpacity={0.85}
+        >
+          <Plus size={28} color={colors.bg} strokeWidth={2.5} />
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
@@ -609,9 +707,11 @@ const styles = StyleSheet.create({
   },
 
   // FAB
-  fab: {
+  fabWrap: {
     position: 'absolute',
     right: 24,
+  },
+  fab: {
     width: 58,
     height: 58,
     borderRadius: 29,
@@ -623,5 +723,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
+  },
+  fabMenu: {
+    position: 'absolute',
+    right: 16,
+    backgroundColor: colors.bgElevated,
+    borderRadius: 14,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    minWidth: 160,
+  },
+  fabMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  fabMenuItemDisabled: { opacity: 0.5 },
+  fabMenuText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 15,
+    color: colors.text,
   },
 });

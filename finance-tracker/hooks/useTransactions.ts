@@ -1,8 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { format, startOfDay } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { startOfMonth, endOfMonth } from '@/lib/utils';
 import type { Transaction, MonthlyStats, TransactionType } from '@/lib/types';
 import { applyTransactionXp } from './useProgress';
+import { deleteNoSpendDayForDate } from './useNoSpendDays';
+import { markCaptureDoneToday } from './useDailyCompletions';
 
 export const TX_KEY = ['transactions'] as const;
 
@@ -91,7 +94,13 @@ export function useCreateTransaction() {
       };
       const { data, error } = await supabase.from('transactions').insert(payload).select().single();
       if (error) throw error;
+      // Fire-and-forget side effects
+      const occurredDate = format(startOfDay(new Date(payload.occurred_at)), 'yyyy-MM-dd');
       applyTransactionXp(payload.occurred_at).catch(() => {});
+      deleteNoSpendDayForDate(occurredDate, user.id).catch(() => {});
+      // Only mark capture petal if the transaction is for today
+      const isToday = occurredDate === format(startOfDay(new Date()), 'yyyy-MM-dd');
+      if (isToday) markCaptureDoneToday().catch(() => {});
       return data as Transaction;
     },
     onSuccess: () => {
@@ -99,6 +108,8 @@ export function useCreateTransaction() {
       qc.invalidateQueries({ queryKey: ['wallets'] });
       qc.invalidateQueries({ queryKey: ['user_progress'] });
       qc.invalidateQueries({ queryKey: ['streak'] });
+      qc.invalidateQueries({ queryKey: ['no_spend_days'] });
+      qc.invalidateQueries({ queryKey: ['daily_completions'] });
     },
   });
 }

@@ -1,75 +1,108 @@
+import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Flame } from 'lucide-react-native';
 import { colors } from '@/theme/colors';
 import { Creature } from './Creature';
-import { xpToStage, nextStageXp, moodFromLastLogged, type UserProgress } from '@/hooks/useProgress';
+import { Petals } from './garden/Petals';
+import { PlantDetailSheet } from './garden/PlantDetailSheet';
+import { xpToStage, moodFromLastLogged, type UserProgress } from '@/hooks/useProgress';
 import type { StreakInfo } from '@/hooks/useStreak';
-
-const STAGE_LABELS: Record<number, string> = {
-  1: 'Sprout',
-  2: 'Seedling',
-  3: 'Budding',
-  4: 'Blooming',
-  5: 'Flourishing',
-};
+import type { DailyCompletion } from '@/hooks/useDailyCompletions';
+import type { SpeciesKey } from '@/lib/garden/species';
 
 interface CreatureCardProps {
   progress: UserProgress;
   streak?: StreakInfo | null;
-  onPress?: () => void;
+  completion?: DailyCompletion | null;
+  showPetals?: boolean;
+  onHarvest?: () => void;
 }
 
-export function CreatureCard({ progress, streak, onPress }: CreatureCardProps) {
+export function CreatureCard({
+  progress,
+  streak,
+  completion,
+  showPetals = true,
+  onHarvest,
+}: CreatureCardProps) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   const stage = xpToStage(progress.xp);
   const mood = moodFromLastLogged(progress.last_logged_date);
-  const next = nextStageXp(progress.xp);
-  const prevThreshold = [0, 0, 50, 200, 500, 1500][stage];
-  const rangeSize = next ? next - prevThreshold : 1;
-  const xpInRange = Math.min(progress.xp - prevThreshold, rangeSize);
-  const pct = next ? xpInRange / rangeSize : 1;
+  const species = ((progress as any).active_plant_species ?? 'sprout') as SpeciesKey;
+
+  const capture = completion?.capture_done ?? false;
+  const awareness = completion?.awareness_done ?? false;
+  const discipline = completion?.discipline_done ?? false;
+  const allDone = capture && awareness && discipline;
 
   const streakCount = streak?.current ?? 0;
   const todayLogged = streak?.todayLogged ?? false;
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={styles.card}>
-      <View style={styles.creatureWrap}>
-        <Creature stage={stage} mood={mood} size={120} />
-      </View>
-      <View style={styles.info}>
-        <View style={styles.topRow}>
-          <Text style={styles.stageName}>{STAGE_LABELS[stage]}</Text>
-          {streakCount > 0 && (
-            <View style={styles.streak}>
-              <Flame size={13} color={todayLogged ? colors.warning : colors.textDim} />
-              <Text style={[styles.streakNum, { color: todayLogged ? colors.warning : colors.textDim }]}>
-                {streakCount}
-              </Text>
+    <>
+      <TouchableOpacity onPress={() => setSheetOpen(true)} activeOpacity={0.85} style={styles.card}>
+        <View style={styles.plantWrap}>
+          <Creature stage={stage} mood={mood} size={110} species={species} />
+          {showPetals && (
+            <View style={styles.petalOverlay}>
+              <Petals
+                capture={capture}
+                awareness={awareness}
+                discipline={discipline}
+                size={110}
+                showGlow={allDone}
+              />
             </View>
           )}
         </View>
-        <View style={styles.xpBarBg}>
-          <View style={[styles.xpBarFill, { width: `${Math.round(pct * 100)}%` }]} />
+        <View style={styles.info}>
+          <View style={styles.topRow}>
+            <Text style={styles.speciesName}>{capitalize(species)}</Text>
+            {streakCount > 0 && (
+              <View style={styles.streak}>
+                <Flame size={13} color={todayLogged ? colors.warning : colors.textDim} />
+                <Text style={[styles.streakNum, { color: todayLogged ? colors.warning : colors.textDim }]}>
+                  {streakCount}
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.moodLabel}>{moodLine(mood, todayLogged)}</Text>
+          {showPetals && (
+            <View style={styles.petalDots}>
+              <View style={[styles.dot, capture && styles.dotFilled, { backgroundColor: capture ? colors.accent : undefined }]} />
+              <View style={[styles.dot, awareness && styles.dotFilled, { backgroundColor: awareness ? '#9B8EC4' : undefined }]} />
+              <View style={[styles.dot, discipline && styles.dotFilled, { backgroundColor: discipline ? colors.warning : undefined }]} />
+            </View>
+          )}
         </View>
-        <Text style={styles.xpLabel}>
-          {next
-            ? `${progress.xp} / ${next} XP`
-            : `${progress.xp} XP — max stage!`}
-        </Text>
-        <Text style={styles.moodLabel}>{moodLabel(mood)}</Text>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+
+      <PlantDetailSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        progress={progress}
+        completion={completion ?? null}
+        streak={streak}
+        onHarvest={() => {
+          setSheetOpen(false);
+          onHarvest?.();
+        }}
+      />
+    </>
   );
 }
 
-function moodLabel(mood: string) {
-  switch (mood) {
-    case 'happy': return 'Thriving today!';
-    case 'neutral': return 'Doing well';
-    case 'sleepy': return 'Getting sleepy…';
-    case 'hungry': return 'Needs your attention';
-    default: return '';
-  }
+function moodLine(mood: string, todayLogged: boolean): string {
+  if (mood === 'happy') return 'Thriving today';
+  if (mood === 'neutral') return 'Doing well';
+  if (mood === 'sleepy') return 'Getting sleepy…';
+  return 'Needs your attention';
+}
+
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 const styles = StyleSheet.create({
@@ -83,12 +116,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
   },
-  creatureWrap: {
-    width: 120,
+  plantWrap: {
+    width: 110,
     height: 110,
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 6,
+    justifyContent: 'center',
+  },
+  petalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   info: {
     flex: 1,
@@ -100,7 +137,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  stageName: {
+  speciesName: {
     fontFamily: 'InstrumentSerif_400Regular',
     fontSize: 20,
     color: colors.text,
@@ -114,25 +151,25 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
   },
-  xpBarBg: {
-    height: 5,
-    backgroundColor: colors.bgInput,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  xpBarFill: {
-    height: 5,
-    backgroundColor: colors.accent,
-    borderRadius: 3,
-  },
-  xpLabel: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: colors.textDim,
-  },
   moodLabel: {
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     color: colors.textMuted,
+  },
+  petalDots: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: colors.bgInput,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dotFilled: {
+    borderWidth: 0,
   },
 });

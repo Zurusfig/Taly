@@ -77,7 +77,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { showOnHome, setShowOnHome } = usePortfolioStore();
   const { data: streak } = useStreak();
-  const { minimalMode, setMinimalMode } = usePrefsStore();
+  const { minimalMode, setMinimalMode, soundEnabled, setSoundEnabled } = usePrefsStore();
 
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
@@ -256,9 +256,24 @@ export default function SettingsScreen() {
           <ToggleRow
             icon={<Leaf size={18} color={colors.textMuted} />}
             label="Minimal mode"
-            sublabel="Hide creature and streak chip"
+            sublabel="Hide petals, Sunday cards, quest nudges, and celebration animations"
             value={minimalMode}
             onValueChange={setMinimalMode}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            icon={<Leaf size={18} color={colors.textMuted} />}
+            label="Garden"
+            sublabel="View your plant collection"
+            onPress={() => router.push('/(app)/garden/index')}
+          />
+          <View style={styles.divider} />
+          <ToggleRow
+            icon={<Leaf size={18} color={colors.textMuted} />}
+            label="Sound effects"
+            sublabel="Soft chimes on save, quest complete, harvest"
+            value={soundEnabled ?? false}
+            onValueChange={setSoundEnabled ?? (() => {})}
           />
         </View>
       </View>
