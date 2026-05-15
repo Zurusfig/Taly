@@ -242,10 +242,27 @@ For each period show:
 - Subscription CRUD
 - Auto-log on cycle date
 
-### Phase 4 — Assets
-- Asset CRUD
-- Supabase Edge Function for price refresh
-- Portfolio card on home
+### Phase 4 — Assets (complete)
+- Asset CRUD with symbol search (Stock/ETF via Finnhub /search)
+- Portfolio tab in bottom nav (between Transactions and Summary)
+- Edge Functions: `refresh-prices` (Finnhub quotes + USD/THB rate), `search-symbols` (Finnhub search)
+- `portfolio_snapshots` table — daily snapshots, see migration at `supabase/migrations/20260515_portfolio_snapshots.sql`
+- Portfolio screen: header with total + day change, area chart (PortfolioChart), holdings list with sort, currency toggle (USD/THB/Both) persisted in Zustand
+- Net worth screen (`/(app)/net-worth`) — wallets + portfolio, donut chart with expand toggle
+- Home portfolio card with inline sparkline + day change + net worth link
+- Auto-refresh on app open when last refresh > 15 min AND market hours (9:30–16:00 ET weekdays)
+- Snapshot taken after each successful price refresh
+- `stores/portfolioStore.ts` — `CurrencyMode`, `TimeRange`, `usdToThb`, `shouldAutoRefresh()`, `isMarketHours()`
+
+### Edge Function deployment (one-time)
+```bash
+cd finance-tracker
+npx supabase@latest functions deploy refresh-prices
+npx supabase@latest functions deploy search-symbols
+npx supabase@latest secrets set FINNHUB_API_KEY=<key>
+```
+Or set the secret via Supabase Dashboard → Settings → Edge Functions → Secrets.
+Run the SQL in `supabase/migrations/20260515_portfolio_snapshots.sql` in the Supabase SQL editor.
 
 ### Phase 5 — Polish
 - JSON export/import

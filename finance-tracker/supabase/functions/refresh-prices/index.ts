@@ -1,73 +1,58 @@
 // Supabase Edge Function — refresh-prices
-// Fetches live prices from Finnhub and USD→THB exchange rate.
-// Deploy: supabase functions deploy refresh-prices
-// Secrets: supabase secrets set FINNHUB_API_KEY=<key>
+// Fetches live prices from Finnhub for each symbol and USD→THB rate.
+// Deploy:  supabase functions deploy refresh-prices
+// Secret:  supabase secrets set FINNHUB_API_KEY=<key>
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
-const corsHeaders = {
+const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface AssetRef {
-  id: string;
-  symbol: string;
-  type: string;
-  currency: string;
-}
+interface AssetRef { id: string; symbol: string; type: string; currency: string; }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
     const { assets } = (await req.json()) as { assets: AssetRef[] };
-    const finnhubKey = Deno.env.get('FINNHUB_API_KEY');
+    const key = Deno.env.get('FINNHUB_API_KEY');
 
-    const prices: Record<string, number> = {};
+    const prices: Record<string, { current_price: number; percent_change: number }> = {};
 
-    // Fetch each symbol from Finnhub
-    await Promise.all(
-      assets.map(async (a) => {
-        if (!a.symbol) return;
-        try {
-          const res = await fetch(
-            `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(a.symbol)}&token=${finnhubKey}`,
-          );
-          const data = await res.json();
-          // Finnhub quote: { c: current price, ... }
-          if (data.c && data.c > 0) {
-            prices[a.symbol] = data.c;
-          }
-        } catch {
-          // Skip failed symbols
+    // Batch to stay within 60 req/min free tier — process sequentially with delay
+    for (const a of assets) {
+      if (!a.symbol) continue;
+      try {
+        const res = await fetch(
+          `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(a.symbol)}&token=${key}`,
+        );
+        const d = await res.json();
+        // d.c = current price, d.dp = % change
+        if (d.c && d.c > 0) {
+          prices[a.symbol] = { current_price: d.c, percent_change: d.dp ?? 0 };
         }
-      }),
-    );
-
-    // Fetch USD → THB exchange rate
-    let usdToThb = 35;
-    try {
-      const fxRes = await fetch(
-        'https://api.exchangerate.host/latest?base=USD&symbols=THB',
-      );
-      const fxData = await fxRes.json();
-      if (fxData.rates?.THB) {
-        usdToThb = fxData.rates.THB;
-      }
-    } catch {
-      // Use default rate on failure
+      } catch { /* skip failed symbols */ }
+      // Small delay to respect rate limits
+      await new Promise((r) => setTimeout(r, 100));
     }
 
+    // USD → THB exchange rate (cache: caller stores this for 1h)
+    let usdToThb = 35;
+    try {
+      const fx = await fetch('https://api.exchangerate.host/latest?base=USD&symbols=THB');
+      const fxd = await fx.json();
+      if (fxd.rates?.THB) usdToThb = fxd.rates.THB;
+    } catch { /* use default */ }
+
     return new Response(JSON.stringify({ prices, usdToThb }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
 });

@@ -29,6 +29,9 @@ import { X } from 'lucide-react-native';
 import { useAutoLog } from '@/hooks/useAutoLog';
 import { useAssets } from '@/hooks/useAssets';
 import { usePortfolioStore } from '@/stores/portfolioStore';
+import { useYesterdaySnapshot } from '@/hooks/usePortfolioSnapshot';
+import Svg, { Path } from 'react-native-svg';
+import { usePortfolioSnapshots } from '@/hooks/usePortfolioSnapshot';
 
 // ─── Onboarding ─────────────────────────────────────────────────────────────
 
@@ -90,6 +93,29 @@ function OnboardingView() {
   );
 }
 
+// ─── Mini sparkline for home portfolio card ──────────────────────────────────
+
+import type { Snapshot } from '@/hooks/usePortfolioSnapshot';
+
+function MiniSparkline({ snapshots, usdToThb }: { snapshots: Snapshot[]; usdToThb: number }) {
+  if (snapshots.length < 2) return <View style={{ width: 64 }} />;
+  const W = 64; const H = 32;
+  const vals = snapshots.map((s) => s.total_value_usd * usdToThb);
+  const min = Math.min(...vals); const max = Math.max(...vals);
+  const range = max - min || 1;
+  const pts = vals.map((v, i) => ({
+    x: (i / (vals.length - 1)) * W,
+    y: H - ((v - min) / range) * H * 0.9 - H * 0.05,
+  }));
+  const lineD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const isUp = vals[vals.length - 1] >= vals[0];
+  return (
+    <Svg width={W} height={H}>
+      <Path d={lineD} stroke={isUp ? colors.accent : colors.danger} strokeWidth={1.5} fill="none" />
+    </Svg>
+  );
+}
+
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
@@ -107,6 +133,8 @@ export default function HomeScreen() {
   const { data: categories } = useCategories();
   const { data: assets } = useAssets();
   const { usdToThb } = usePortfolioStore();
+  const { data: yesterdaySnap } = useYesterdaySnapshot();
+  const { data: recentSnapshots } = usePortfolioSnapshots('1W');
 
   const isLoading = walletsLoading;
   const hasWallets = (wallets?.length ?? 0) > 0;
@@ -114,14 +142,12 @@ export default function HomeScreen() {
   const totalBalance = wallets?.reduce((s, w) => s + w.balance, 0) ?? 0;
 
   const portfolioValueUsd = (assets ?? []).reduce((s, a) => {
-    const price = a.last_price ?? a.avg_cost_per_unit ?? 0;
-    return s + a.quantity * price;
+    return s + a.quantity * (a.last_price ?? a.avg_cost_per_unit ?? 0);
   }, 0);
-  const portfolioCostUsd = (assets ?? []).reduce((s, a) => {
-    return s + a.quantity * (a.avg_cost_per_unit ?? 0);
-  }, 0);
-  const portfolioGain = portfolioValueUsd - portfolioCostUsd;
-  const portfolioGainPct = portfolioCostUsd > 0 ? (portfolioGain / portfolioCostUsd) * 100 : null;
+  const portfolioValueThb = portfolioValueUsd * usdToThb;
+  const prevUsd = yesterdaySnap?.total_value_usd ?? null;
+  const dayChangePct = prevUsd && prevUsd > 0
+    ? ((portfolioValueUsd - prevUsd) / prevUsd) * 100 : null;
   const hasAssets = (assets?.length ?? 0) > 0;
 
   const categoryMap = Object.fromEntries((categories ?? []).map((c) => [c.id, c]));
@@ -224,34 +250,47 @@ export default function HomeScreen() {
           <>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Portfolio</Text>
-              <TouchableOpacity onPress={() => router.push('/(app)/assets')}>
+              <TouchableOpacity onPress={() => router.push('/(app)/(tabs)/portfolio')}>
                 <Text style={styles.sectionAction}>View</Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity
               style={styles.portfolioCard}
-              onPress={() => router.push('/(app)/assets')}
+              onPress={() => router.push('/(app)/(tabs)/portfolio')}
               activeOpacity={0.8}
             >
-              <View>
+              <View style={styles.portfolioLeft}>
                 <Text style={styles.portfolioLabel}>Total value</Text>
-                <Text style={styles.portfolioValue}>฿{formatAmount(portfolioValueUsd * usdToThb)}</Text>
+                <Text style={styles.portfolioValue}>฿{formatAmount(portfolioValueThb)}</Text>
                 <Text style={styles.portfolioUsd}>${formatAmount(portfolioValueUsd)} USD</Text>
+                {dayChangePct !== null && (
+                  <View style={styles.portfolioDayRow}>
+                    {dayChangePct >= 0
+                      ? <TrendingUp size={11} color={colors.accent} />
+                      : <TrendingDown size={11} color={colors.danger} />
+                    }
+                    <Text style={[
+                      styles.portfolioDayText,
+                      { color: dayChangePct >= 0 ? colors.accent : colors.danger },
+                    ]}>
+                      {dayChangePct >= 0 ? '+' : ''}{dayChangePct.toFixed(2)}% today
+                    </Text>
+                  </View>
+                )}
               </View>
-              {portfolioGainPct !== null && (
-                <View style={styles.portfolioGainWrap}>
-                  {portfolioGain >= 0
-                    ? <TrendingUp size={16} color={colors.accent} />
-                    : <TrendingDown size={16} color={colors.danger} />
-                  }
-                  <Text style={[
-                    styles.portfolioGainText,
-                    { color: portfolioGain >= 0 ? colors.accent : colors.danger },
-                  ]}>
-                    {portfolioGain >= 0 ? '+' : ''}{portfolioGainPct.toFixed(2)}%
-                  </Text>
-                </View>
-              )}
+              <MiniSparkline snapshots={recentSnapshots ?? []} usdToThb={usdToThb} />
+            </TouchableOpacity>
+
+            {/* Net worth link */}
+            <TouchableOpacity
+              style={styles.netWorthLink}
+              onPress={() => router.push('/(app)/net-worth')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.netWorthLinkText}>
+                Total net worth (wallets + portfolio): ฿{formatAmount(totalBalance + portfolioValueThb)}
+              </Text>
+              <TrendingUp size={14} color={colors.accent} />
             </TouchableOpacity>
           </>
         )}
@@ -437,7 +476,7 @@ const styles = StyleSheet.create({
   // Portfolio card
   portfolioCard: {
     marginHorizontal: 16,
-    marginBottom: 24,
+    marginBottom: 8,
     backgroundColor: colors.bgElevated,
     borderRadius: 14,
     padding: 16,
@@ -445,6 +484,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  portfolioLeft: { flex: 1, gap: 2 },
   portfolioLabel: {
     fontFamily: 'Inter_400Regular',
     fontSize: 11,
@@ -465,18 +505,32 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontVariant: ['tabular-nums'],
   },
-  portfolioGainWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.bgInput,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  portfolioDayRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  portfolioDayText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
   },
-  portfolioGainText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
+
+  // Net worth link
+  netWorthLink: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: colors.bgElevated,
+    borderRadius: 10,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.accent,
+  },
+  netWorthLinkText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: colors.text,
+    flex: 1,
     fontVariant: ['tabular-nums'],
   },
 

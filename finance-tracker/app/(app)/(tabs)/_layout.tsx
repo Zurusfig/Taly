@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, List, BarChart2, Settings } from 'lucide-react-native';
+import { Home, List, TrendingUp, BarChart2, Settings } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 import { colors } from '@/theme/colors';
 
@@ -22,6 +22,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="transactions"
         options={{ tabBarIcon: ({ color }) => <List size={24} color={color} /> }}
+      />
+      <Tabs.Screen
+        name="portfolio"
+        options={{ tabBarIcon: ({ color }) => <TrendingUp size={24} color={color} /> }}
       />
       <Tabs.Screen
         name="summary"

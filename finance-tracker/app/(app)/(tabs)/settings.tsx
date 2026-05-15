@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronRight, Wallet, Tag, Target, Repeat, BarChart2, LogOut } from 'lucide-react-native';
+import { ChevronRight, Wallet, Tag, Target, Repeat, LogOut } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
 import { queryClient } from '@/lib/queryClient';
@@ -69,12 +69,6 @@ export default function SettingsScreen() {
             icon={<Repeat size={18} color={colors.textMuted} />}
             label="Subscriptions"
             onPress={() => router.push('/(app)/subscriptions')}
-          />
-          <View style={styles.divider} />
-          <SettingsRow
-            icon={<BarChart2 size={18} color={colors.textMuted} />}
-            label="Portfolio"
-            onPress={() => router.push('/(app)/assets')}
           />
         </View>
       </View>
