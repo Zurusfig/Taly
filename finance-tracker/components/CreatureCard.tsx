@@ -5,7 +5,8 @@ import { colors } from '@/theme/colors';
 import { Creature } from './Creature';
 import { Petals } from './garden/Petals';
 import { PlantDetailSheet } from './garden/PlantDetailSheet';
-import { xpToStage, moodFromLastLogged, type UserProgress } from '@/hooks/useProgress';
+import { XpProgressBar } from './ui/XpProgressBar';
+import { xpToStage, nextStageXp, moodFromLastLogged, type UserProgress } from '@/hooks/useProgress';
 import type { StreakInfo } from '@/hooks/useStreak';
 import type { DailyCompletion } from '@/hooks/useDailyCompletions';
 import type { SpeciesKey } from '@/lib/garden/species';
@@ -30,6 +31,11 @@ export function CreatureCard({
   const stage = xpToStage(progress.xp);
   const mood = moodFromLastLogged(progress.last_logged_date);
   const species = ((progress as any).active_plant_species ?? 'sprout') as SpeciesKey;
+
+  const maxXp = nextStageXp(progress.xp);
+  const prevThreshold = [0, 50, 200, 500, 1500].reverse().find((t) => progress.xp >= t) ?? 0;
+  const xpInStage = progress.xp - prevThreshold;
+  const xpForStage = maxXp !== null ? maxXp - prevThreshold : 1;
 
   const capture = completion?.capture_done ?? false;
   const awareness = completion?.awareness_done ?? false;
@@ -69,6 +75,11 @@ export function CreatureCard({
             )}
           </View>
           <Text style={styles.moodLabel}>{moodLine(mood, todayLogged)}</Text>
+          {maxXp !== null && (
+            <View style={styles.xpBar}>
+              <XpProgressBar xp={xpInStage} maxXp={xpForStage} />
+            </View>
+          )}
           {showPetals && (
             <View style={styles.petalDots}>
               <View style={[styles.dot, capture && styles.dotFilled, { backgroundColor: capture ? colors.accent : undefined }]} />
@@ -155,6 +166,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     color: colors.textMuted,
+  },
+  xpBar: {
+    marginTop: 4,
+    marginRight: 4,
   },
   petalDots: {
     flexDirection: 'row',

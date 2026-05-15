@@ -10,6 +10,7 @@ export interface UserProgress {
   created_at: string;
   active_plant_species: string;
   active_plant_planted_at: string | null;
+  long_press_hint_dismissed: boolean;
 }
 
 export type CreatureStage = 1 | 2 | 3 | 4 | 5;

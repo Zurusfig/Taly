@@ -1,19 +1,20 @@
-import { useState, useRef, useCallback, Fragment } from 'react';
+import { useState, useCallback, Fragment } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, Modal, FlatList, LogBox,
+  Alert, Modal, FlatList, LogBox, Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  runOnJS,
+  withTiming,
+  withSequence,
+  Easing,
 } from 'react-native-reanimated';
-import { X } from 'lucide-react-native';
+import { X, Check } from 'lucide-react-native';
 import { colors } from '@/theme/colors';
 import { currencySymbol, formatAmount } from '@/lib/utils';
 import { NumPad, useNumPadAmount } from '@/components/ui/NumPad';
@@ -74,7 +75,7 @@ function PickerModal<T extends { id: string; name: string; color?: string | null
   );
 }
 
-// ─── Type Toggle ─────────────────────────────────────────────────────────────
+// ─── Type Toggle ──────────────────────────────────────────────────────────────
 
 const TYPES: { key: TransactionType; label: string }[] = [
   { key: 'expense', label: 'Expense' },
@@ -102,95 +103,95 @@ function TypeToggle({ value, onChange }: { value: TransactionType; onChange: (t:
   );
 }
 
-// ─── Drag Save Button ─────────────────────────────────────────────────────────
+// ─── Tap Save Button ──────────────────────────────────────────────────────────
 
-const DRAG_MAX = -100;   // px upward for 100% threshold
-const DRAG_WARN = DRAG_MAX * 0.6;
-const DRAG_COMMIT = DRAG_MAX;
-
-interface DragSaveButtonProps {
+interface TapSaveButtonProps {
   onSave: () => Promise<void>;
   loading: boolean;
   typeColor: string;
-  hasDiscovered: boolean;
-  onDiscovered: () => void;
 }
 
-function DragSaveButton({ onSave, loading, typeColor, hasDiscovered, onDiscovered }: DragSaveButtonProps) {
-  const dragY = useSharedValue(0);
-  const warnedRef = useRef(false);
-  const committedRef = useRef(false);
+function TapSaveButton({ onSave, loading, typeColor }: TapSaveButtonProps) {
+  const scale = useSharedValue(1);
+  const checkOpacity = useSharedValue(0);
+  const checkScale = useSharedValue(0.6);
+  const glowScale = useSharedValue(0.8);
+  const glowOpacity = useSharedValue(0);
+  const [saving, setSaving] = useState(false);
 
-  function triggerWarn() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  const btnStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const checkStyle = useAnimatedStyle(() => ({
+    opacity: checkOpacity.value,
+    transform: [{ scale: checkScale.value }],
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+    transform: [{ scale: glowScale.value }],
+  }));
+
+  async function handlePress() {
+    if (loading || saving) return;
+    setSaving(true);
+
+    try {
+      await onSave();
+      // Success animation
+      scale.value = withSpring(1, { damping: 18, stiffness: 300 });
+      checkOpacity.value = withTiming(1, { duration: 180 });
+      checkScale.value = withSpring(1, { damping: 12, stiffness: 260 });
+      glowOpacity.value = withSequence(
+        withTiming(0.6, { duration: 160 }),
+        withTiming(0, { duration: 320 }),
+      );
+      glowScale.value = withTiming(1.6, { duration: 480, easing: Easing.out(Easing.cubic) });
+    } catch {
+      scale.value = withSpring(1);
+      setSaving(false);
+    }
   }
-
-  function triggerCommit() {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    if (!hasDiscovered) onDiscovered();
-    onSave().catch(() => {});
-  }
-
-  const panGesture = Gesture.Pan()
-    .onUpdate((e) => {
-      if (e.translationY >= 0) {
-        dragY.value = 0;
-        return;
-      }
-      dragY.value = Math.max(e.translationY, DRAG_MAX * 1.05);
-      // Warn haptic at 60%
-      if (dragY.value <= DRAG_WARN && !warnedRef.current) {
-        warnedRef.current = true;
-        runOnJS(triggerWarn)();
-      }
-      if (dragY.value > DRAG_WARN) {
-        warnedRef.current = false;
-      }
-    })
-    .onEnd(() => {
-      if (dragY.value <= DRAG_COMMIT) {
-        committedRef.current = true;
-        runOnJS(triggerCommit)();
-      }
-      dragY.value = withSpring(0, { damping: 18, stiffness: 220 });
-      warnedRef.current = false;
-      committedRef.current = false;
-    });
-
-  const tapGesture = Gesture.Tap().onEnd(() => {
-    runOnJS(onSave)();
-  });
-
-  const gesture = Gesture.Race(panGesture, tapGesture);
-
-  // Pill stretches upward: translateY follows drag, height grows
-  const pillStyle = useAnimatedStyle(() => {
-    const progress = Math.min(Math.abs(dragY.value) / Math.abs(DRAG_MAX), 1);
-    return {
-      transform: [{ translateY: dragY.value * 0.4 }],
-      paddingTop: 14 + progress * 8,
-    };
-  });
-
-  // Hint arrow (pulsing, only shown before first discovery)
-  const hintOpacity = useSharedValue(hasDiscovered ? 0 : 0.7);
-
-  const hintStyle = useAnimatedStyle(() => ({ opacity: hintOpacity.value }));
 
   return (
-    <View>
-      {!hasDiscovered && (
-        <Animated.View style={[styles.dragHint, hintStyle]}>
-          <Text style={styles.dragHintText}>↑</Text>
-        </Animated.View>
-      )}
-      <GestureDetector gesture={gesture}>
+    <View style={styles.saveBtnWrap}>
+      {/* Glow ring */}
+      <Animated.View
+        style={[
+          styles.glowRing,
+          { borderColor: typeColor },
+          glowStyle,
+        ]}
+        pointerEvents="none"
+      />
+
+      <Pressable
+        onPressIn={() => {
+          scale.value = withSpring(0.96, { damping: 18, stiffness: 300 });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 18, stiffness: 300 });
+        }}
+        onPress={handlePress}
+        disabled={loading || saving}
+      >
         <Animated.View
-          style={[styles.saveBtn, { backgroundColor: loading ? colors.textDim : typeColor }, pillStyle]}
+          style={[
+            styles.saveBtn,
+            { backgroundColor: (loading || saving) ? colors.textDim : typeColor },
+            btnStyle,
+          ]}
         >
-          <Text style={styles.saveBtnText}>{loading ? '…' : 'Save'}</Text>
+          {saving ? (
+            <Animated.View style={checkStyle}>
+              <Check size={22} color={colors.bg} strokeWidth={2.5} />
+            </Animated.View>
+          ) : (
+            <Text style={styles.saveBtnText}>{loading ? '…' : 'Save'}</Text>
+          )}
         </Animated.View>
-      </GestureDetector>
+      </Pressable>
     </View>
   );
 }
@@ -212,7 +213,6 @@ export default function QuickLog() {
   const [showWalletPicker, setShowWalletPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showToWalletPicker, setShowToWalletPicker] = useState(false);
-  const [dragDiscovered, setDragDiscovered] = useState(false);
 
   const handleKey = useNumPadAmount();
 
@@ -233,20 +233,18 @@ export default function QuickLog() {
     if (amount <= 0) { Alert.alert('Enter an amount'); return; }
     if (!effectiveWalletId) { Alert.alert('Select a wallet'); return; }
     if (type === 'transfer' && !effectiveToWalletId) { Alert.alert('Select a destination wallet'); return; }
-    try {
-      await createTx.mutateAsync({
-        wallet_id: effectiveWalletId,
-        category_id: effectiveCategoryId,
-        to_wallet_id: effectiveToWalletId,
-        type,
-        amount,
-        note: note.trim() || null,
-      });
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
-    }
+    await createTx.mutateAsync({
+      wallet_id: effectiveWalletId,
+      category_id: effectiveCategoryId,
+      to_wallet_id: effectiveToWalletId,
+      type,
+      amount,
+      note: note.trim() || null,
+    });
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // Brief delay so checkmark animation plays before dismissing
+    await new Promise((r) => setTimeout(r, 400));
+    router.back();
   }, [amount, effectiveWalletId, type, effectiveToWalletId, effectiveCategoryId, note, createTx]);
 
   return (
@@ -299,12 +297,10 @@ export default function QuickLog() {
         <NumPad onKey={(key) => setAmountStr((prev) => handleKey(prev, key))} />
       </View>
 
-      <DragSaveButton
+      <TapSaveButton
         onSave={handleSave}
         loading={createTx.isPending}
         typeColor={typeColor}
-        hasDiscovered={dragDiscovered}
-        onDiscovered={() => setDragDiscovered(true)}
       />
 
       <PickerModal
@@ -366,9 +362,23 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   numpad: { flex: 1 },
+
+  saveBtnWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glowRing: {
+    position: 'absolute',
+    width: '100%',
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 2,
+    opacity: 0,
+  },
   saveBtn: {
     borderRadius: 14,
-    paddingBottom: 14,
+    height: 52,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -377,15 +387,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: colors.bg,
   },
-  dragHint: {
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  dragHintText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    color: colors.textDim,
-  },
+
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   pickerSheet: {
     position: 'absolute',

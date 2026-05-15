@@ -279,6 +279,25 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.group}>
+        <Text style={styles.groupLabel}>Tips</Text>
+        <View style={styles.card}>
+          {[
+            { icon: '⟳', title: 'Long-press the + button', body: 'Hold the FAB for ~0.6s to open the quick menu — mark a no-spend day or log faster.' },
+            { icon: '⚡', title: 'Log at the counter', body: 'Transactions logged within 5 minutes of the purchase time earn bonus XP and a ⚡ badge.' },
+            { icon: '🪴', title: 'Harvest at Stage 5', body: 'Tap your plant card when fully grown to harvest it and add it to your garden collection.' },
+          ].map((tip, i, arr) => (
+            <View key={tip.title}>
+              <View style={styles.tipRow}>
+                <Text style={styles.tipTitle}>{tip.title}</Text>
+                <Text style={styles.tipBody}>{tip.body}</Text>
+              </View>
+              {i < arr.length - 1 && <View style={styles.divider} />}
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.group}>
         <Text style={styles.groupLabel}>Account</Text>
         <View style={styles.card}>
           <SettingsRow
@@ -330,4 +349,7 @@ const styles = StyleSheet.create({
   rowLabel: { fontFamily: 'Inter_400Regular', fontSize: 16, color: colors.text },
   rowSublabel: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textDim },
   divider: { height: 1, backgroundColor: colors.border, marginLeft: 52 },
+  tipRow: { paddingVertical: 14, paddingHorizontal: 16, gap: 4 },
+  tipTitle: { fontFamily: 'Inter_500Medium', fontSize: 14, color: colors.text },
+  tipBody: { fontFamily: 'Inter_400Regular', fontSize: 13, color: colors.textMuted, lineHeight: 18 },
 });

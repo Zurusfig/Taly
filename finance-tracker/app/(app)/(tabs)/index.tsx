@@ -4,17 +4,25 @@ import {
   ScrollView,
   FlatList,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   ActivityIndicator,
   Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useEffect } from 'react';
-import { Plus, Wallet as WalletIcon, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { useCallback, useRef, useEffect, useState } from 'react';
+import { Plus, Wallet as WalletIcon, TrendingUp, TrendingDown, Flame, Leaf, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { format } from 'date-fns';
+import { format, isToday } from 'date-fns';
+import Svg, { Path, Circle as SvgCircle } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedProps,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { colors } from '@/theme/colors';
-import { formatCurrency, formatAmount } from '@/lib/utils';
+import { formatAmount } from '@/lib/utils';
 import { useWallets } from '@/hooks/useWallets';
 import { useRecentTransactions, useMonthlyStats } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
@@ -24,8 +32,6 @@ import { Button } from '@/components/ui/Button';
 import { seedDefaultCategories } from '@/hooks/useCategories';
 import { useCreateWallet } from '@/hooks/useWallets';
 import { Input } from '@/components/ui/Input';
-import { useState } from 'react';
-import { X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAutoLog } from '@/hooks/useAutoLog';
 import { useAssets } from '@/hooks/useAssets';
@@ -37,13 +43,15 @@ import { useProgress } from '@/hooks/useProgress';
 import { usePrefsStore } from '@/stores/prefsStore';
 import { CreatureCard } from '@/components/CreatureCard';
 import { InsightCard } from '@/components/garden/InsightCard';
+import { MicroFeedbackChip } from '@/components/MicroFeedbackChip';
+import { useMicroFeedbackStore } from '@/stores/microFeedbackStore';
 import { useTodayCompletion } from '@/hooks/useDailyCompletions';
 import { useTodayNoSpendDay, useMarkNoSpendDay } from '@/hooks/useNoSpendDays';
 import { useThisSundayInsight, useGenerateSundayInsight, useDismissInsight } from '@/hooks/useWeeklyInsights';
 import { useHarvestPlant } from '@/hooks/useGarden';
-import Svg, { Path } from 'react-native-svg';
-import { Flame, Leaf } from 'lucide-react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+
+const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
+const RING_CIRCUMFERENCE = 2 * Math.PI * 32;
 
 // ─── Onboarding ─────────────────────────────────────────────────────────────
 
@@ -158,16 +166,31 @@ export default function HomeScreen() {
   const generateInsight = useGenerateSundayInsight();
   const dismissInsight = useDismissInsight();
   const harvestPlant = useHarvestPlant();
+  const { pendingFact } = useMicroFeedbackStore();
   const [showFabMenu, setShowFabMenu] = useState(false);
-  const fabScale = useSharedValue(1);
+
+  // Long-press progress ring
+  const ringProgress = useSharedValue(0);
+  const ringProps = useAnimatedProps(() => ({
+    strokeDashoffset: RING_CIRCUMFERENCE * (1 - ringProgress.value),
+    opacity: ringProgress.value > 0 ? 0.9 : 0,
+  }));
+  const LONG_PRESS_MS = 600;
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStarted = useRef(false);
+
+  // Derived: has any transaction recorded today?
+  const hasTodayTx = (recentTxs ?? []).some((tx) => isToday(new Date(tx.occurred_at)));
+  const noSpendDisabled = todayNoSpend != null || hasTodayTx;
+
+  // Onboarding hint: show after ≥3 transactions, not dismissed, not minimal mode
+  const hintDismissed = progress?.long_press_hint_dismissed ?? true;
+  const txCount = recentTxs?.length ?? 0;
+  const showLongPressHint = !minimalMode && !hintDismissed && txCount >= 3 && !showFabMenu;
 
   useEffect(() => {
     generateInsight.mutate();
   }, []);
-
-  const fabStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: fabScale.value }],
-  }));
   const { show: showReconcile, dismiss: dismissReconcile } = useReconciliation(hasCashWallet);
 
   const isLoading = walletsLoading;
@@ -405,6 +428,21 @@ export default function HomeScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
+      {/* Micro-feedback chip (above wallet section, floats) */}
+      {pendingFact && (
+        <View style={[styles.chipWrap, { bottom: 84 + insets.bottom + 72 }]}>
+          <MicroFeedbackChip />
+        </View>
+      )}
+
+      {/* Long-press onboarding hint */}
+      {showLongPressHint && (
+        <View style={[styles.hintBubble, { bottom: 84 + insets.bottom + 68 }]}>
+          <Text style={styles.hintText}>Hold the + button for quick actions</Text>
+          <View style={styles.hintArrow} />
+        </View>
+      )}
+
       {/* FAB long-press menu */}
       {showFabMenu && (
         <TouchableOpacity
@@ -431,46 +469,77 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={[
               styles.fabMenuItem,
-              (todayNoSpend != null) && styles.fabMenuItemDisabled,
+              noSpendDisabled && styles.fabMenuItemDisabled,
             ]}
             onPress={() => {
-              if (todayNoSpend != null) return;
+              if (noSpendDisabled) {
+                Alert.alert(
+                  'Already logged today',
+                  'No-spend day cannot be marked when you have transactions today.',
+                );
+                return;
+              }
               setShowFabMenu(false);
               markNoSpend.mutate();
             }}
             activeOpacity={0.8}
-            disabled={todayNoSpend != null}
           >
-            <Leaf size={16} color={todayNoSpend != null ? colors.textDim : colors.accent} />
-            <Text style={[styles.fabMenuText, todayNoSpend != null && { color: colors.textDim }]}>
+            <Leaf size={16} color={noSpendDisabled ? colors.textDim : colors.accent} />
+            <Text style={[styles.fabMenuText, noSpendDisabled && { color: colors.textDim }]}>
               {todayNoSpend != null ? 'No-spend marked' : 'No-spend day'}
             </Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* FAB */}
-      <Animated.View style={[styles.fabWrap, { bottom: 84 + insets.bottom }, fabStyle]}>
-        <TouchableOpacity
+      {/* FAB with progress ring */}
+      <View style={[styles.fabWrap, { bottom: 84 + insets.bottom }]}>
+        {/* SVG progress ring */}
+        <Svg width={70} height={70} style={StyleSheet.absoluteFill} viewBox="0 0 70 70">
+          <AnimatedSvgCircle
+            cx={35} cy={35} r={32}
+            stroke={colors.accent}
+            strokeWidth={2.5}
+            strokeDasharray={RING_CIRCUMFERENCE}
+            strokeLinecap="round"
+            fill="none"
+            rotation={-90}
+            origin="35, 35"
+            animatedProps={ringProps}
+          />
+        </Svg>
+        <Pressable
           style={styles.fab}
-          onPress={() => {
-            if (showFabMenu) { setShowFabMenu(false); return; }
-            if (pushing.current) return;
-            pushing.current = true;
-            router.push('/(app)/quick-log');
+          onPressIn={() => {
+            if (showFabMenu) return;
+            longPressStarted.current = false;
+            ringProgress.value = withTiming(1, {
+              duration: LONG_PRESS_MS,
+              easing: Easing.linear,
+            });
+            longPressTimer.current = setTimeout(() => {
+              longPressStarted.current = true;
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+              setShowFabMenu(true);
+            }, LONG_PRESS_MS);
           }}
-          onLongPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            fabScale.value = withSpring(1.12, { damping: 10, stiffness: 300 });
-            setTimeout(() => { fabScale.value = withSpring(1); }, 200);
-            setShowFabMenu(true);
+          onPressOut={() => {
+            if (longPressTimer.current) clearTimeout(longPressTimer.current);
+            ringProgress.value = withTiming(0, { duration: 200 });
+            if (!longPressStarted.current) {
+              // Normal tap
+              if (showFabMenu) { setShowFabMenu(false); return; }
+              if (pushing.current) return;
+              pushing.current = true;
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              router.push('/(app)/quick-log');
+            }
+            longPressStarted.current = false;
           }}
-          delayLongPress={500}
-          activeOpacity={0.85}
         >
           <Plus size={28} color={colors.bg} strokeWidth={2.5} />
-        </TouchableOpacity>
-      </Animated.View>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -710,6 +779,10 @@ const styles = StyleSheet.create({
   fabWrap: {
     position: 'absolute',
     right: 24,
+    width: 70,
+    height: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fab: {
     width: 58,
@@ -723,6 +796,43 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
+  },
+  chipWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  hintBubble: {
+    position: 'absolute',
+    right: 16,
+    backgroundColor: colors.bgElevated,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxWidth: 200,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  hintText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: colors.text,
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+  hintArrow: {
+    position: 'absolute',
+    bottom: -6,
+    right: 28,
+    width: 10,
+    height: 10,
+    backgroundColor: colors.bgElevated,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+    transform: [{ rotate: '45deg' }],
   },
   fabMenu: {
     position: 'absolute',
