@@ -24,12 +24,12 @@ export default function TabsLayout() {
         options={{ tabBarIcon: ({ color }) => <List size={24} color={color} /> }}
       />
       <Tabs.Screen
-        name="portfolio"
-        options={{ tabBarIcon: ({ color }) => <TrendingUp size={24} color={color} /> }}
-      />
-      <Tabs.Screen
         name="summary"
         options={{ tabBarIcon: ({ color }) => <BarChart2 size={24} color={color} /> }}
+      />
+      <Tabs.Screen
+        name="portfolio"
+        options={{ tabBarIcon: ({ color }) => <TrendingUp size={24} color={color} /> }}
       />
       <Tabs.Screen
         name="settings"
