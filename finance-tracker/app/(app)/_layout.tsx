@@ -31,6 +31,7 @@ export default function AppLayout() {
       <Stack.Screen name="assets/[id]" />
       <Stack.Screen name="net-worth" />
       <Stack.Screen name="garden/index" options={{ presentation: 'card' }} />
+      <Stack.Screen name="achievements/index" options={{ presentation: 'card' }} />
     </Stack>
   );
 }

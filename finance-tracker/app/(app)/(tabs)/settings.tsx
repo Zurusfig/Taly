@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ChevronRight, Wallet, Tag, Target, Repeat,
-  TrendingUp, Download, Upload, Fingerprint, LogOut,
+  TrendingUp, Download, Upload, Fingerprint, LogOut, Trophy,
 } from 'lucide-react-native';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -266,6 +266,13 @@ export default function SettingsScreen() {
             label="Garden"
             sublabel="View your plant collection"
             onPress={() => router.push('/(app)/garden/index')}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            icon={<Trophy size={18} color={colors.textMuted} />}
+            label="Achievements"
+            sublabel="View your unlocked achievements"
+            onPress={() => router.push('/(app)/achievements')}
           />
           <View style={styles.divider} />
           <ToggleRow

@@ -23,6 +23,7 @@ import { colors } from '@/theme/colors';
 import { LockScreen } from '@/components/LockScreen';
 import { getBiometricEnabled, authenticate } from '@/hooks/useBiometric';
 import { usePrefsStore } from '@/stores/prefsStore';
+import { AchievementToastQueue } from '@/components/achievements/AchievementToast';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -171,6 +172,7 @@ function RootLayoutInner() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(app)" />
       </Stack>
+      <AchievementToastQueue />
       <StatusBar style="light" />
     </View>
   );

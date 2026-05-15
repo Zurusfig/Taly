@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView } from 'react-native';
-import { X, Leaf } from 'lucide-react-native';
+import { X, Leaf, Trophy } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { differenceInDays } from 'date-fns';
 import { colors } from '@/theme/colors';
@@ -21,6 +22,7 @@ interface PlantDetailSheetProps {
 export function PlantDetailSheet({
   visible, onClose, progress, completion, streak, onHarvest,
 }: PlantDetailSheetProps) {
+  const router = useRouter();
   const stage = xpToStage(progress.xp);
   const mood = moodFromLastLogged(progress.last_logged_date);
   const next = nextStageXp(progress.xp);
@@ -111,6 +113,15 @@ export function PlantDetailSheet({
             {!canHarvest && (
               <Text style={styles.gardenHint}>Reach Stage 5 to harvest into your garden.</Text>
             )}
+
+            <TouchableOpacity
+              style={styles.achievementsLink}
+              onPress={() => { onClose(); router.push('/(app)/achievements'); }}
+              activeOpacity={0.7}
+            >
+              <Trophy size={14} color={colors.textDim} />
+              <Text style={styles.achievementsLinkText}>View achievements</Text>
+            </TouchableOpacity>
           </ScrollView>
         </View>
       </View>
@@ -250,5 +261,18 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     textAlign: 'center',
     marginTop: 8,
+  },
+  achievementsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 20,
+    paddingVertical: 8,
+  },
+  achievementsLinkText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: colors.textDim,
   },
 });

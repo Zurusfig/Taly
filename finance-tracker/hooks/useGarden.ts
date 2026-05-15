@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { addDays } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { randomSpeciesExcluding, type SpeciesKey } from '@/lib/garden/species';
+import { checkAchievementsStandalone } from './useAchievements';
 
 export const GARDEN_KEY = ['garden'] as const;
 export const PACKETS_KEY = ['seed_packets'] as const;
@@ -83,6 +84,15 @@ export function useHarvestPlant() {
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', user.id);
+
+      // Achievement check for harvest milestones
+      const { count: gardenCount } = await supabase
+        .from('plants')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      checkAchievementsStandalone({ isHarvest: true, gardenCount: gardenCount ?? 1 }).catch(
+        () => {},
+      );
 
       return newSpecies;
     },
