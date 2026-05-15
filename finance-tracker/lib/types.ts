@@ -47,6 +47,22 @@ export interface MonthlyStats {
   net: number;
 }
 
+export type AssetType = 'stock' | 'etf' | 'gold' | 'crypto' | 'other';
+
+export interface Asset {
+  id: string;
+  user_id: string;
+  type: AssetType;
+  symbol: string | null;
+  name: string;
+  quantity: number;
+  avg_cost_per_unit: number | null;
+  currency: string;
+  last_price: number | null;
+  last_price_updated_at: string | null;
+  created_at: string;
+}
+
 export type SubscriptionCycle = 'weekly' | 'monthly' | 'yearly';
 
 export interface Subscription {

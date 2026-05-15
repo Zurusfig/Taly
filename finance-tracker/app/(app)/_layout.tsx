@@ -27,6 +27,9 @@ export default function AppLayout() {
       <Stack.Screen name="subscriptions/index" />
       <Stack.Screen name="subscriptions/new" />
       <Stack.Screen name="subscriptions/[id]" />
+      <Stack.Screen name="assets/index" />
+      <Stack.Screen name="assets/new" />
+      <Stack.Screen name="assets/[id]" />
     </Stack>
   );
 }

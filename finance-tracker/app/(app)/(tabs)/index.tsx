@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useRef } from 'react';
-import { Plus, Wallet as WalletIcon } from 'lucide-react-native';
+import { Plus, Wallet as WalletIcon, TrendingUp, TrendingDown } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
 import { colors } from '@/theme/colors';
@@ -27,6 +27,8 @@ import { Input } from '@/components/ui/Input';
 import { useState } from 'react';
 import { X } from 'lucide-react-native';
 import { useAutoLog } from '@/hooks/useAutoLog';
+import { useAssets } from '@/hooks/useAssets';
+import { usePortfolioStore } from '@/stores/portfolioStore';
 
 // ─── Onboarding ─────────────────────────────────────────────────────────────
 
@@ -103,11 +105,24 @@ export default function HomeScreen() {
   const { data: stats } = useMonthlyStats();
   const { data: recentTxs } = useRecentTransactions(5);
   const { data: categories } = useCategories();
+  const { data: assets } = useAssets();
+  const { usdToThb } = usePortfolioStore();
 
   const isLoading = walletsLoading;
   const hasWallets = (wallets?.length ?? 0) > 0;
 
   const totalBalance = wallets?.reduce((s, w) => s + w.balance, 0) ?? 0;
+
+  const portfolioValueUsd = (assets ?? []).reduce((s, a) => {
+    const price = a.last_price ?? a.avg_cost_per_unit ?? 0;
+    return s + a.quantity * price;
+  }, 0);
+  const portfolioCostUsd = (assets ?? []).reduce((s, a) => {
+    return s + a.quantity * (a.avg_cost_per_unit ?? 0);
+  }, 0);
+  const portfolioGain = portfolioValueUsd - portfolioCostUsd;
+  const portfolioGainPct = portfolioCostUsd > 0 ? (portfolioGain / portfolioCostUsd) * 100 : null;
+  const hasAssets = (assets?.length ?? 0) > 0;
 
   const categoryMap = Object.fromEntries((categories ?? []).map((c) => [c.id, c]));
   const walletMap = Object.fromEntries((wallets ?? []).map((w) => [w.id, w]));
@@ -203,6 +218,43 @@ export default function HomeScreen() {
           contentContainerStyle={styles.walletList}
           showsHorizontalScrollIndicator={false}
         />
+
+        {/* Portfolio card */}
+        {hasAssets && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Portfolio</Text>
+              <TouchableOpacity onPress={() => router.push('/(app)/assets')}>
+                <Text style={styles.sectionAction}>View</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={styles.portfolioCard}
+              onPress={() => router.push('/(app)/assets')}
+              activeOpacity={0.8}
+            >
+              <View>
+                <Text style={styles.portfolioLabel}>Total value</Text>
+                <Text style={styles.portfolioValue}>฿{formatAmount(portfolioValueUsd * usdToThb)}</Text>
+                <Text style={styles.portfolioUsd}>${formatAmount(portfolioValueUsd)} USD</Text>
+              </View>
+              {portfolioGainPct !== null && (
+                <View style={styles.portfolioGainWrap}>
+                  {portfolioGain >= 0
+                    ? <TrendingUp size={16} color={colors.accent} />
+                    : <TrendingDown size={16} color={colors.danger} />
+                  }
+                  <Text style={[
+                    styles.portfolioGainText,
+                    { color: portfolioGain >= 0 ? colors.accent : colors.danger },
+                  ]}>
+                    {portfolioGain >= 0 ? '+' : ''}{portfolioGainPct.toFixed(2)}%
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* Recent transactions */}
         <View style={styles.sectionHeader}>
@@ -380,6 +432,52 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
     color: colors.textMuted,
+  },
+
+  // Portfolio card
+  portfolioCard: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+    backgroundColor: colors.bgElevated,
+    borderRadius: 14,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  portfolioLabel: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    color: colors.textDim,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  portfolioValue: {
+    fontFamily: 'InstrumentSerif_400Regular',
+    fontSize: 24,
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
+  },
+  portfolioUsd: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: colors.textMuted,
+    fontVariant: ['tabular-nums'],
+  },
+  portfolioGainWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.bgInput,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  portfolioGainText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    fontVariant: ['tabular-nums'],
   },
 
   // FAB
