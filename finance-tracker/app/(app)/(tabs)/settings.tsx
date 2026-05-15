@@ -1,10 +1,11 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronRight, Wallet, Tag, Target, Repeat, LogOut } from 'lucide-react-native';
+import { ChevronRight, Wallet, Tag, Target, Repeat, TrendingUp, LogOut } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
 import { queryClient } from '@/lib/queryClient';
+import { usePortfolioStore } from '@/stores/portfolioStore';
 
 function SettingsRow({
   icon, label, onPress, destructive,
@@ -20,9 +21,29 @@ function SettingsRow({
   );
 }
 
+function ToggleRow({
+  icon, label, value, onValueChange,
+}: {
+  icon: React.ReactNode; label: string; value: boolean; onValueChange: (v: boolean) => void;
+}) {
+  return (
+    <View style={styles.row}>
+      <View style={styles.rowIcon}>{icon}</View>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: colors.bgInput, true: colors.accentMuted }}
+        thumbColor={value ? colors.accent : colors.textDim}
+      />
+    </View>
+  );
+}
+
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { showOnHome, setShowOnHome } = usePortfolioStore();
 
   async function handleSignOut() {
     Alert.alert('Sign out', 'Are you sure?', [
@@ -69,6 +90,18 @@ export default function SettingsScreen() {
             icon={<Repeat size={18} color={colors.textMuted} />}
             label="Subscriptions"
             onPress={() => router.push('/(app)/subscriptions')}
+          />
+        </View>
+      </View>
+
+      <View style={styles.group}>
+        <Text style={styles.groupLabel}>Display</Text>
+        <View style={styles.card}>
+          <ToggleRow
+            icon={<TrendingUp size={18} color={colors.textMuted} />}
+            label="Show portfolio on Home"
+            value={showOnHome}
+            onValueChange={setShowOnHome}
           />
         </View>
       </View>

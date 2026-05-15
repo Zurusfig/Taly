@@ -9,10 +9,12 @@ interface PortfolioState {
   usdToThb: number;
   rateUpdatedAt: string | null;
   lastRefreshed: string | null;
+  showOnHome: boolean;
   setCurrencyMode: (m: CurrencyMode) => void;
   setTimeRange: (r: TimeRange) => void;
   setRate: (rate: number, at: string) => void;
   setLastRefreshed: (at: string) => void;
+  setShowOnHome: (v: boolean) => void;
 }
 
 export const usePortfolioStore = create<PortfolioState>()((set) => ({
@@ -21,10 +23,12 @@ export const usePortfolioStore = create<PortfolioState>()((set) => ({
   usdToThb: 35,
   rateUpdatedAt: null,
   lastRefreshed: null,
+  showOnHome: true,
   setCurrencyMode: (currencyMode) => set({ currencyMode }),
   setTimeRange: (timeRange) => set({ timeRange }),
   setRate: (usdToThb, rateUpdatedAt) => set({ usdToThb, rateUpdatedAt }),
   setLastRefreshed: (lastRefreshed) => set({ lastRefreshed }),
+  setShowOnHome: (showOnHome) => set({ showOnHome }),
 }));
 
 export function isMarketHours(): boolean {

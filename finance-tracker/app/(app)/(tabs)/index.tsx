@@ -132,7 +132,7 @@ export default function HomeScreen() {
   const { data: recentTxs } = useRecentTransactions(5);
   const { data: categories } = useCategories();
   const { data: assets } = useAssets();
-  const { usdToThb } = usePortfolioStore();
+  const { usdToThb, showOnHome } = usePortfolioStore();
   const { data: yesterdaySnap } = useYesterdaySnapshot();
   const { data: recentSnapshots } = usePortfolioSnapshots('1W');
 
@@ -246,7 +246,7 @@ export default function HomeScreen() {
         />
 
         {/* Portfolio card */}
-        {hasAssets && (
+        {hasAssets && showOnHome && (
           <>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Portfolio</Text>
