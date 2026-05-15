@@ -49,6 +49,7 @@ import { useTodayCompletion } from '@/hooks/useDailyCompletions';
 import { useTodayNoSpendDay, useMarkNoSpendDay } from '@/hooks/useNoSpendDays';
 import { useThisSundayInsight, useGenerateSundayInsight, useDismissInsight } from '@/hooks/useWeeklyInsights';
 import { useHarvestPlant } from '@/hooks/useGarden';
+import { supabase } from '@/lib/supabase';
 
 const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
 const RING_CIRCUMFERENCE = 2 * Math.PI * 32;
@@ -168,6 +169,7 @@ export default function HomeScreen() {
   const harvestPlant = useHarvestPlant();
   const { pendingFact } = useMicroFeedbackStore();
   const [showFabMenu, setShowFabMenu] = useState(false);
+  const [hintLocallyDismissed, setHintLocallyDismissed] = useState(false);
 
   // Long-press progress ring
   const ringProgress = useSharedValue(0);
@@ -186,7 +188,18 @@ export default function HomeScreen() {
   // Onboarding hint: show after ≥3 transactions, not dismissed, not minimal mode
   const hintDismissed = progress?.long_press_hint_dismissed ?? true;
   const txCount = recentTxs?.length ?? 0;
-  const showLongPressHint = !minimalMode && !hintDismissed && txCount >= 3 && !showFabMenu;
+  const showLongPressHint = !minimalMode && !hintDismissed && !hintLocallyDismissed && txCount >= 3 && !showFabMenu;
+
+  async function dismissHint() {
+    setHintLocallyDismissed(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      supabase.from('user_progress')
+        .update({ long_press_hint_dismissed: true })
+        .eq('user_id', user.id)
+        .then(() => {});
+    }
+  }
 
   useEffect(() => {
     generateInsight.mutate();
@@ -437,10 +450,14 @@ export default function HomeScreen() {
 
       {/* Long-press onboarding hint */}
       {showLongPressHint && (
-        <View style={[styles.hintBubble, { bottom: 84 + insets.bottom + 68 }]}>
+        <TouchableOpacity
+          style={[styles.hintBubble, { bottom: 84 + insets.bottom + 90 }]}
+          onPress={dismissHint}
+          activeOpacity={0.8}
+        >
           <Text style={styles.hintText}>Hold the + button for quick actions</Text>
           <View style={styles.hintArrow} />
-        </View>
+        </TouchableOpacity>
       )}
 
       {/* FAB long-press menu */}
@@ -520,6 +537,7 @@ export default function HomeScreen() {
             longPressTimer.current = setTimeout(() => {
               longPressStarted.current = true;
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+              dismissHint();
               setShowFabMenu(true);
             }, LONG_PRESS_MS);
           }}

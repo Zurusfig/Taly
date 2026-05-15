@@ -282,9 +282,9 @@ export default function SettingsScreen() {
         <Text style={styles.groupLabel}>Tips</Text>
         <View style={styles.card}>
           {[
-            { icon: '⟳', title: 'Long-press the + button', body: 'Hold the FAB for ~0.6s to open the quick menu — mark a no-spend day or log faster.' },
-            { icon: '⚡', title: 'Log at the counter', body: 'Transactions logged within 5 minutes of the purchase time earn bonus XP and a ⚡ badge.' },
-            { icon: '🪴', title: 'Harvest at Stage 5', body: 'Tap your plant card when fully grown to harvest it and add it to your garden collection.' },
+            { title: 'Hold the + button', body: 'Opens a quick menu to mark a no-spend day.' },
+            { title: 'Log right away', body: 'Logging immediately after a purchase earns bonus XP and a speed badge.' },
+            { title: 'Harvest at Stage 5', body: 'Tap your plant when fully grown to save it to your garden.' },
           ].map((tip, i, arr) => (
             <View key={tip.title}>
               <View style={styles.tipRow}>

@@ -167,6 +167,7 @@ function TapSaveButton({ onSave, loading, typeColor }: TapSaveButtonProps) {
       />
 
       <Pressable
+        style={{ width: '100%' }}
         onPressIn={() => {
           scale.value = withSpring(0.96, { damping: 18, stiffness: 300 });
         }}
@@ -364,8 +365,7 @@ const styles = StyleSheet.create({
   numpad: { flex: 1 },
 
   saveBtnWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: '100%',
   },
   glowRing: {
     position: 'absolute',
