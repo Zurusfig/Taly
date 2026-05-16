@@ -262,13 +262,6 @@ export default function SettingsScreen() {
           />
           <View style={styles.divider} />
           <SettingsRow
-            icon={<Leaf size={18} color={colors.textMuted} />}
-            label="Garden"
-            sublabel="View your plant collection"
-            onPress={() => router.push('/(app)/garden/index')}
-          />
-          <View style={styles.divider} />
-          <SettingsRow
             icon={<Trophy size={18} color={colors.textMuted} />}
             label="Achievements"
             sublabel="View your unlocked achievements"
