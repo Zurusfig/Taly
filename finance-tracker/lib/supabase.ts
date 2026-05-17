@@ -4,25 +4,19 @@ import * as SecureStore from 'expo-secure-store';
 import { createClient } from '@supabase/supabase-js';
 
 // expo-secure-store only works on native; fall back to localStorage on web.
+const hasLocalStorage = typeof localStorage !== 'undefined';
+
 const storage = {
   getItem: (key: string): Promise<string | null> => {
-    if (Platform.OS === 'web') {
-      return Promise.resolve(localStorage.getItem(key));
-    }
+    if (hasLocalStorage) return Promise.resolve(localStorage.getItem(key));
     return SecureStore.getItemAsync(key);
   },
   setItem: (key: string, value: string): Promise<void> => {
-    if (Platform.OS === 'web') {
-      localStorage.setItem(key, value);
-      return Promise.resolve();
-    }
+    if (hasLocalStorage) { localStorage.setItem(key, value); return Promise.resolve(); }
     return SecureStore.setItemAsync(key, value);
   },
   removeItem: (key: string): Promise<void> => {
-    if (Platform.OS === 'web') {
-      localStorage.removeItem(key);
-      return Promise.resolve();
-    }
+    if (hasLocalStorage) { localStorage.removeItem(key); return Promise.resolve(); }
     return SecureStore.deleteItemAsync(key);
   },
 };

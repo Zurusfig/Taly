@@ -590,10 +590,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(97, 152, 142, 0.4)',
     elevation: 8,
   },
 });
