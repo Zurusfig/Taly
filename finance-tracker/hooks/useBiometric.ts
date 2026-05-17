@@ -1,18 +1,19 @@
-import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import { getItem, setItem } from '@/lib/storage';
 
 const KEY = 'biometric_enabled';
 
 export async function isBiometricAvailable(): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
+  const LocalAuthentication = await import('expo-local-authentication');
   const compatible = await LocalAuthentication.hasHardwareAsync();
   if (!compatible) return false;
-  const enrolled = await LocalAuthentication.isEnrolledAsync();
-  return enrolled;
+  return LocalAuthentication.isEnrolledAsync();
 }
 
 export async function getBiometricEnabled(): Promise<boolean> {
   try {
-    const val = await SecureStore.getItemAsync(KEY);
+    const val = await getItem(KEY);
     return val === 'true';
   } catch {
     return false;
@@ -20,10 +21,12 @@ export async function getBiometricEnabled(): Promise<boolean> {
 }
 
 export async function setBiometricEnabled(enabled: boolean): Promise<void> {
-  await SecureStore.setItemAsync(KEY, enabled ? 'true' : 'false');
+  await setItem(KEY, enabled ? 'true' : 'false');
 }
 
 export async function authenticate(): Promise<boolean> {
+  if (Platform.OS === 'web') return true;
+  const LocalAuthentication = await import('expo-local-authentication');
   const result = await LocalAuthentication.authenticateAsync({
     promptMessage: 'Unlock Taly',
     fallbackLabel: 'Use passcode',
