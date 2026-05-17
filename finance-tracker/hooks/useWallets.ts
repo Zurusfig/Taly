@@ -25,7 +25,7 @@ async function fetchWallets(): Promise<Wallet[]> {
 }
 
 export function useWallets() {
-  return useQuery({ queryKey: WALLETS_KEY, queryFn: fetchWallets });
+  return useQuery({ queryKey: WALLETS_KEY, queryFn: fetchWallets, retry: 3, retryDelay: 1000 });
 }
 
 type WalletInput = Pick<Wallet, 'name' | 'type' | 'initial_balance' | 'currency' | 'icon' | 'color'>;

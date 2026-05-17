@@ -230,7 +230,7 @@ export default function HomeScreen() {
   const categoryMap = Object.fromEntries((categories ?? []).map((c) => [c.id, c]));
   const walletMap = Object.fromEntries((wallets ?? []).map((w) => [w.id, w]));
 
-  if (isLoading) {
+  if (isLoading || wallets === undefined) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <ActivityIndicator color={colors.accent} />
