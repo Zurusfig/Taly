@@ -1,23 +1,23 @@
-import { useState, Fragment } from 'react';
+import { useState, useCallback, Fragment } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  Modal,
-  FlatList,
-  LogBox,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  Alert, Modal, FlatList, LogBox, Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X } from 'lucide-react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withSequence,
+  Easing,
+} from 'react-native-reanimated';
+import { X, Check } from 'lucide-react-native';
 import { colors } from '@/theme/colors';
 import { currencySymbol, formatAmount } from '@/lib/utils';
 import { NumPad, useNumPadAmount } from '@/components/ui/NumPad';
-import { Button } from '@/components/ui/Button';
 import { PillButton } from '@/components/ui/PillButton';
 import { useWallets } from '@/hooks/useWallets';
 import { useCategories } from '@/hooks/useCategories';
@@ -75,7 +75,7 @@ function PickerModal<T extends { id: string; name: string; color?: string | null
   );
 }
 
-// ─── Type Toggle ─────────────────────────────────────────────────────────────
+// ─── Type Toggle ──────────────────────────────────────────────────────────────
 
 const TYPES: { key: TransactionType; label: string }[] = [
   { key: 'expense', label: 'Expense' },
@@ -99,6 +99,100 @@ function TypeToggle({ value, onChange }: { value: TransactionType; onChange: (t:
           </TouchableOpacity>
         </Fragment>
       ))}
+    </View>
+  );
+}
+
+// ─── Tap Save Button ──────────────────────────────────────────────────────────
+
+interface TapSaveButtonProps {
+  onSave: () => Promise<void>;
+  loading: boolean;
+  typeColor: string;
+}
+
+function TapSaveButton({ onSave, loading, typeColor }: TapSaveButtonProps) {
+  const scale = useSharedValue(1);
+  const checkOpacity = useSharedValue(0);
+  const checkScale = useSharedValue(0.6);
+  const glowScale = useSharedValue(0.8);
+  const glowOpacity = useSharedValue(0);
+  const [saving, setSaving] = useState(false);
+
+  const btnStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const checkStyle = useAnimatedStyle(() => ({
+    opacity: checkOpacity.value,
+    transform: [{ scale: checkScale.value }],
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+    transform: [{ scale: glowScale.value }],
+  }));
+
+  async function handlePress() {
+    if (loading || saving) return;
+    setSaving(true);
+
+    try {
+      await onSave();
+      // Success animation
+      scale.value = withSpring(1, { damping: 18, stiffness: 300 });
+      checkOpacity.value = withTiming(1, { duration: 180 });
+      checkScale.value = withSpring(1, { damping: 12, stiffness: 260 });
+      glowOpacity.value = withSequence(
+        withTiming(0.6, { duration: 160 }),
+        withTiming(0, { duration: 320 }),
+      );
+      glowScale.value = withTiming(1.6, { duration: 480, easing: Easing.out(Easing.cubic) });
+    } catch {
+      scale.value = withSpring(1);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <View style={styles.saveBtnWrap}>
+      {/* Glow ring */}
+      <Animated.View
+        style={[
+          styles.glowRing,
+          { borderColor: typeColor },
+          glowStyle,
+        ]}
+        pointerEvents="none"
+      />
+
+      <Pressable
+        style={{ width: '100%' }}
+        onPressIn={() => {
+          scale.value = withSpring(0.96, { damping: 18, stiffness: 300 });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 18, stiffness: 300 });
+        }}
+        onPress={handlePress}
+        disabled={loading || saving}
+      >
+        <Animated.View
+          style={[
+            styles.saveBtn,
+            { backgroundColor: (loading || saving) ? colors.textDim : typeColor },
+            btnStyle,
+          ]}
+        >
+          {saving ? (
+            <Animated.View style={checkStyle}>
+              <Check size={22} color={colors.bg} strokeWidth={2.5} />
+            </Animated.View>
+          ) : (
+            <Text style={styles.saveBtnText}>{loading ? '…' : 'Save'}</Text>
+          )}
+        </Animated.View>
+      </Pressable>
     </View>
   );
 }
@@ -136,25 +230,23 @@ export default function QuickLog() {
   const effectiveCategoryId = type !== 'transfer' ? (activeCategory?.id ?? null) : null;
   const effectiveToWalletId = type === 'transfer' ? (activeToWallet?.id ?? null) : null;
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     if (amount <= 0) { Alert.alert('Enter an amount'); return; }
     if (!effectiveWalletId) { Alert.alert('Select a wallet'); return; }
     if (type === 'transfer' && !effectiveToWalletId) { Alert.alert('Select a destination wallet'); return; }
-    try {
-      await createTx.mutateAsync({
-        wallet_id: effectiveWalletId,
-        category_id: effectiveCategoryId,
-        to_wallet_id: effectiveToWalletId,
-        type,
-        amount,
-        note: note.trim() || null,
-      });
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
-    }
-  }
+    await createTx.mutateAsync({
+      wallet_id: effectiveWalletId,
+      category_id: effectiveCategoryId,
+      to_wallet_id: effectiveToWalletId,
+      type,
+      amount,
+      note: note.trim() || null,
+    });
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // Brief delay so checkmark animation plays before dismissing
+    await new Promise((r) => setTimeout(r, 400));
+    router.back();
+  }, [amount, effectiveWalletId, type, effectiveToWalletId, effectiveCategoryId, note, createTx]);
 
   return (
     <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
@@ -206,11 +298,10 @@ export default function QuickLog() {
         <NumPad onKey={(key) => setAmountStr((prev) => handleKey(prev, key))} />
       </View>
 
-      <Button
-        label="Save"
-        onPress={handleSave}
+      <TapSaveButton
+        onSave={handleSave}
         loading={createTx.isPending}
-        style={[styles.saveBtn, { backgroundColor: typeColor }]}
+        typeColor={typeColor}
       />
 
       <PickerModal
@@ -250,9 +341,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
+    width: 36, height: 4, borderRadius: 2,
     backgroundColor: colors.border,
     alignSelf: 'center',
     marginBottom: 4,
@@ -274,13 +363,35 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   numpad: { flex: 1 },
-  saveBtn: { marginTop: 4 },
+
+  saveBtnWrap: {
+    width: '100%',
+  },
+  glowRing: {
+    position: 'absolute',
+    width: '100%',
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 2,
+    opacity: 0,
+  },
+  saveBtn: {
+    borderRadius: 14,
+    height: 52,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 17,
+    color: colors.bg,
+  },
+
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   pickerSheet: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    bottom: 0, left: 0, right: 0,
     backgroundColor: colors.bgElevated,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

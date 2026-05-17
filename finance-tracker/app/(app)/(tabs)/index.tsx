@@ -4,17 +4,25 @@ import {
   ScrollView,
   FlatList,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   ActivityIndicator,
   Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useCallback, useRef } from 'react';
-import { Plus, Wallet as WalletIcon, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { useCallback, useRef, useEffect, useState } from 'react';
+import { Plus, Wallet as WalletIcon, TrendingUp, TrendingDown, Flame, Leaf, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { format } from 'date-fns';
+import { format, isToday } from 'date-fns';
+import Svg, { Path, Circle as SvgCircle } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedProps,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { colors } from '@/theme/colors';
-import { formatCurrency, formatAmount } from '@/lib/utils';
+import { formatAmount } from '@/lib/utils';
 import { useWallets } from '@/hooks/useWallets';
 import { useRecentTransactions, useMonthlyStats } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
@@ -24,8 +32,7 @@ import { Button } from '@/components/ui/Button';
 import { seedDefaultCategories } from '@/hooks/useCategories';
 import { useCreateWallet } from '@/hooks/useWallets';
 import { Input } from '@/components/ui/Input';
-import { useState } from 'react';
-import { X } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { useAutoLog } from '@/hooks/useAutoLog';
 import { useAssets } from '@/hooks/useAssets';
 import { usePortfolioStore } from '@/stores/portfolioStore';
@@ -35,8 +42,17 @@ import { useReconciliation } from '@/hooks/useReconciliation';
 import { useProgress } from '@/hooks/useProgress';
 import { usePrefsStore } from '@/stores/prefsStore';
 import { CreatureCard } from '@/components/CreatureCard';
-import Svg, { Path } from 'react-native-svg';
-import { Flame } from 'lucide-react-native';
+import { InsightCard } from '@/components/garden/InsightCard';
+import { MicroFeedbackChip } from '@/components/MicroFeedbackChip';
+import { useMicroFeedbackStore } from '@/stores/microFeedbackStore';
+import { useTodayCompletion } from '@/hooks/useDailyCompletions';
+import { useTodayNoSpendDay, useMarkNoSpendDay } from '@/hooks/useNoSpendDays';
+import { useThisSundayInsight, useGenerateSundayInsight, useDismissInsight } from '@/hooks/useWeeklyInsights';
+import { useHarvestPlant } from '@/hooks/useGarden';
+import { supabase } from '@/lib/supabase';
+
+const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
+const RING_CIRCUMFERENCE = 2 * Math.PI * 32;
 
 // ─── Onboarding ─────────────────────────────────────────────────────────────
 
@@ -144,6 +160,57 @@ export default function HomeScreen() {
   const { data: progress } = useProgress();
   const { minimalMode } = usePrefsStore();
   const hasCashWallet = (wallets ?? []).some((w) => w.type === 'cash');
+  const { data: todayCompletion } = useTodayCompletion();
+  const { data: todayNoSpend } = useTodayNoSpendDay();
+  const markNoSpend = useMarkNoSpendDay();
+  const { data: sundayInsight } = useThisSundayInsight();
+  const generateInsight = useGenerateSundayInsight();
+  const dismissInsight = useDismissInsight();
+  const harvestPlant = useHarvestPlant();
+  const { pendingFact } = useMicroFeedbackStore();
+  const [showFabMenu, setShowFabMenu] = useState(false);
+  const [hintLocallyDismissed, setHintLocallyDismissed] = useState(false);
+
+  // Long-press progress ring
+  const ringProgress = useSharedValue(0);
+  const ringProps = useAnimatedProps(() => ({
+    strokeDashoffset: RING_CIRCUMFERENCE * (1 - ringProgress.value),
+    opacity: ringProgress.value > 0 ? 0.9 : 0,
+  }));
+  const LONG_PRESS_MS = 600;
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStarted = useRef(false);
+
+  // Derived: has any transaction recorded today?
+  const hasTodayTx = (recentTxs ?? []).some((tx) => isToday(new Date(tx.occurred_at)));
+  const noSpendDisabled = todayNoSpend != null || hasTodayTx;
+
+  // Onboarding hint: show after ≥3 transactions, not dismissed, not minimal mode
+  const hintDismissed = progress?.long_press_hint_dismissed ?? true;
+  const txCount = recentTxs?.length ?? 0;
+  const showLongPressHint = !minimalMode && !hintDismissed && !hintLocallyDismissed && txCount >= 3 && !showFabMenu;
+
+  // Auto-dismiss hint after 4s
+  useEffect(() => {
+    if (!showLongPressHint) return;
+    const t = setTimeout(() => setHintLocallyDismissed(true), 4000);
+    return () => clearTimeout(t);
+  }, [showLongPressHint]);
+
+  async function dismissHint() {
+    setHintLocallyDismissed(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      supabase.from('user_progress')
+        .update({ long_press_hint_dismissed: true })
+        .eq('user_id', user.id)
+        .then(() => {});
+    }
+  }
+
+  useEffect(() => {
+    generateInsight.mutate();
+  }, []);
   const { show: showReconcile, dismiss: dismissReconcile } = useReconciliation(hasCashWallet);
 
   const isLoading = walletsLoading;
@@ -163,7 +230,7 @@ export default function HomeScreen() {
   const categoryMap = Object.fromEntries((categories ?? []).map((c) => [c.id, c]));
   const walletMap = Object.fromEntries((wallets ?? []).map((w) => [w.id, w]));
 
-  if (isLoading) {
+  if (isLoading || wallets === undefined) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <ActivityIndicator color={colors.accent} />
@@ -256,9 +323,28 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Sunday insight card */}
+        {!minimalMode && sundayInsight && !sundayInsight.seen && (
+          <InsightCard
+            insight={sundayInsight}
+            onDismiss={() => dismissInsight.mutate(sundayInsight.id)}
+          />
+        )}
+
         {/* Creature card */}
         {!minimalMode && progress && (
-          <CreatureCard progress={progress} streak={streak} />
+          <CreatureCard
+            progress={progress}
+            streak={streak}
+            completion={todayCompletion}
+            onHarvest={() => {
+              const species = (progress as any).active_plant_species ?? 'sprout';
+              harvestPlant.mutate({
+                species,
+                originLabel: `Stage 5 plant harvested`,
+              });
+            }}
+          />
         )}
 
         {/* Wallet cards */}
@@ -361,18 +447,123 @@ export default function HomeScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { bottom: 84 + insets.bottom }]}
-        onPress={() => {
-          if (pushing.current) return;
-          pushing.current = true;
-          router.push('/(app)/quick-log');
-        }}
-        activeOpacity={0.85}
-      >
-        <Plus size={28} color={colors.bg} strokeWidth={2.5} />
-      </TouchableOpacity>
+      {/* Micro-feedback chip (above wallet section, floats) */}
+      {pendingFact && (
+        <View style={[styles.chipWrap, { bottom: 84 + insets.bottom + 72 }]}>
+          <MicroFeedbackChip />
+        </View>
+      )}
+
+      {/* Long-press onboarding hint */}
+      {showLongPressHint && (
+        <TouchableOpacity
+          style={[styles.hintBubble, { bottom: 84 + insets.bottom + 78 }]}
+          onPress={dismissHint}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.hintText}>Hold the + button for quick actions</Text>
+          <View style={styles.hintArrow} />
+        </TouchableOpacity>
+      )}
+
+      {/* FAB long-press menu */}
+      {showFabMenu && (
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={() => setShowFabMenu(false)}
+        />
+      )}
+      {showFabMenu && (
+        <View style={[styles.fabMenu, { bottom: 84 + insets.bottom + 64 }]}>
+          <TouchableOpacity
+            style={styles.fabMenuItem}
+            onPress={() => {
+              setShowFabMenu(false);
+              if (pushing.current) return;
+              pushing.current = true;
+              router.push('/(app)/quick-log');
+            }}
+            activeOpacity={0.8}
+          >
+            <Plus size={16} color={colors.text} />
+            <Text style={styles.fabMenuText}>Log expense</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.fabMenuItem,
+              noSpendDisabled && styles.fabMenuItemDisabled,
+            ]}
+            onPress={() => {
+              if (noSpendDisabled) {
+                Alert.alert(
+                  'Already logged today',
+                  'No-spend day cannot be marked when you have transactions today.',
+                );
+                return;
+              }
+              setShowFabMenu(false);
+              markNoSpend.mutate();
+            }}
+            activeOpacity={0.8}
+          >
+            <Leaf size={16} color={noSpendDisabled ? colors.textDim : colors.accent} />
+            <Text style={[styles.fabMenuText, noSpendDisabled && { color: colors.textDim }]}>
+              {todayNoSpend != null ? 'No-spend marked' : 'No-spend day'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* FAB with progress ring */}
+      <View style={[styles.fabWrap, { bottom: 84 + insets.bottom }]}>
+        {/* SVG progress ring */}
+        <Svg width={70} height={70} style={StyleSheet.absoluteFill} viewBox="0 0 70 70">
+          <AnimatedSvgCircle
+            cx={35} cy={35} r={32}
+            stroke={colors.accent}
+            strokeWidth={2.5}
+            strokeDasharray={RING_CIRCUMFERENCE}
+            strokeLinecap="round"
+            fill="none"
+            rotation={-90}
+            origin="35, 35"
+            animatedProps={ringProps}
+          />
+        </Svg>
+        <Pressable
+          style={styles.fab}
+          onPressIn={() => {
+            if (showFabMenu) return;
+            longPressStarted.current = false;
+            ringProgress.value = withTiming(1, {
+              duration: LONG_PRESS_MS,
+              easing: Easing.linear,
+            });
+            longPressTimer.current = setTimeout(() => {
+              longPressStarted.current = true;
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+              dismissHint();
+              setShowFabMenu(true);
+            }, LONG_PRESS_MS);
+          }}
+          onPressOut={() => {
+            if (longPressTimer.current) clearTimeout(longPressTimer.current);
+            ringProgress.value = withTiming(0, { duration: 200 });
+            if (!longPressStarted.current) {
+              // Normal tap
+              if (showFabMenu) { setShowFabMenu(false); return; }
+              if (pushing.current) return;
+              pushing.current = true;
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              router.push('/(app)/quick-log');
+            }
+            longPressStarted.current = false;
+          }}
+        >
+          <Plus size={28} color={colors.bg} strokeWidth={2.5} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -609,19 +800,82 @@ const styles = StyleSheet.create({
   },
 
   // FAB
-  fab: {
+  fabWrap: {
     position: 'absolute',
     right: 24,
+    width: 70,
+    height: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fab: {
     width: 58,
     height: 58,
     borderRadius: 29,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(97, 152, 142, 0.4)',
     elevation: 8,
+  },
+  chipWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  hintBubble: {
+    position: 'absolute',
+    right: 16,
+    backgroundColor: colors.bgElevated,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxWidth: 200,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  hintText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: colors.text,
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+  hintArrow: {
+    position: 'absolute',
+    bottom: -6,
+    right: 28,
+    width: 10,
+    height: 10,
+    backgroundColor: colors.bgElevated,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+    transform: [{ rotate: '45deg' }],
+  },
+  fabMenu: {
+    position: 'absolute',
+    right: 16,
+    backgroundColor: colors.bgElevated,
+    borderRadius: 14,
+    paddingVertical: 4,
+    boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 8,
+    minWidth: 160,
+  },
+  fabMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  fabMenuItemDisabled: { opacity: 0.5 },
+  fabMenuText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 15,
+    color: colors.text,
   },
 });

@@ -18,6 +18,7 @@ import { colors } from '@/theme/colors';
 import { formatAmount } from '@/lib/utils';
 import { useAssets, useRefreshPrices, type Asset } from '@/hooks/useAssets';
 import { usePortfolioSnapshots, useYesterdaySnapshot, useTakeSnapshot } from '@/hooks/usePortfolioSnapshot';
+import { markAwarenessDoneToday } from '@/hooks/useDailyCompletions';
 import {
   usePortfolioStore,
   shouldAutoRefresh,
@@ -194,6 +195,8 @@ export default function PortfolioScreen() {
   const dayChangePct = prevUsd && prevUsd > 0 ? ((totalUsd - prevUsd) / prevUsd) * 100 : null;
 
   const hasAssets = (assets?.length ?? 0) > 0;
+
+  useEffect(() => { markAwarenessDoneToday().catch(() => {}); }, []);
 
   // Auto-refresh on mount
   useEffect(() => {
@@ -587,10 +590,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(97, 152, 142, 0.4)',
     elevation: 8,
   },
 });

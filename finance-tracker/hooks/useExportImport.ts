@@ -1,7 +1,4 @@
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import * as DocumentPicker from 'expo-document-picker';
-import { Alert } from 'react-native';
+import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
 
@@ -21,22 +18,55 @@ export async function exportData(): Promise<void> {
 
   const json = JSON.stringify(dump, null, 2);
   const filename = `taly-export-${new Date().toISOString().slice(0, 10)}.json`;
+
+  if (Platform.OS === 'web') {
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
+
+  const FileSystem = await import('expo-file-system');
+  const Sharing = await import('expo-sharing');
   const uri = FileSystem.cacheDirectory + filename;
-
   await FileSystem.writeAsStringAsync(uri, json, { encoding: FileSystem.EncodingType.UTF8 });
-
   const canShare = await Sharing.isAvailableAsync();
   if (!canShare) throw new Error('Sharing is not available on this device');
   await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export Taly data' });
 }
 
 export async function importData(mode: 'overwrite' | 'merge'): Promise<void> {
-  const result = await DocumentPicker.getDocumentAsync({ type: 'application/json' });
-  if (result.canceled || !result.assets?.[0]) return;
+  let content: string;
 
-  const content = await FileSystem.readAsStringAsync(result.assets[0].uri, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  if (Platform.OS === 'web') {
+    content = await new Promise((resolve, reject) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'application/json,.json';
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) { reject(new Error('No file selected')); return; }
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsText(file);
+      };
+      input.oncancel = () => reject(new Error('Cancelled'));
+      input.click();
+    });
+  } else {
+    const DocumentPicker = await import('expo-document-picker');
+    const FileSystem = await import('expo-file-system');
+    const result = await DocumentPicker.getDocumentAsync({ type: 'application/json' });
+    if (result.canceled || !result.assets?.[0]) return;
+    content = await FileSystem.readAsStringAsync(result.assets[0].uri, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+  }
 
   let dump: Record<string, unknown[]>;
   try {
@@ -49,7 +79,6 @@ export async function importData(mode: 'overwrite' | 'merge'): Promise<void> {
   if (!user) throw new Error('Not authenticated');
 
   if (mode === 'overwrite') {
-    // Delete existing data in reverse FK order
     for (const table of [...TABLES].reverse()) {
       await supabase.from(table).delete().eq('user_id', user.id);
     }
@@ -63,6 +92,5 @@ export async function importData(mode: 'overwrite' | 'merge'): Promise<void> {
     if (error) throw error;
   }
 
-  // Invalidate all queries
   queryClient.invalidateQueries();
 }

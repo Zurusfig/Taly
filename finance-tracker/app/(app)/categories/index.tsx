@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Plus } from 'lucide-react-native';
 import { colors } from '@/theme/colors';
 import { useCategories } from '@/hooks/useCategories';
+import { useCategoryMasteryMap, masteryLevel, MASTERY_TITLES } from '@/hooks/useCategoryMastery';
 import type { CategoryKind } from '@/lib/types';
 
 const TABS: { key: CategoryKind; label: string }[] = [
@@ -17,6 +18,7 @@ export default function CategoriesScreen() {
   const insets = useSafeAreaInsets();
   const [kind, setKind] = useState<CategoryKind>('expense');
   const { data: categories, isLoading } = useCategories(kind);
+  const { data: masteryMap } = useCategoryMasteryMap();
 
   return (
     <View style={[styles.flex, { paddingTop: insets.top }]}>
@@ -58,6 +60,11 @@ export default function CategoriesScreen() {
             >
               <View style={[styles.colorDot, { backgroundColor: item.color ?? colors.accent }]} />
               <Text style={styles.name}>{item.name}</Text>
+              {masteryMap?.[item.id] && (
+                <Text style={styles.masteryBadge}>
+                  Lv.{masteryLevel(masteryMap[item.id].xp)}
+                </Text>
+              )}
             </TouchableOpacity>
           )}
           ItemSeparatorComponent={() => <View style={styles.sep} />}
@@ -116,6 +123,11 @@ const styles = StyleSheet.create({
   },
   colorDot: { width: 12, height: 12, borderRadius: 6 },
   name: { fontFamily: 'Inter_500Medium', fontSize: 16, color: colors.text, flex: 1 },
+  masteryBadge: {
+    fontFamily: 'InstrumentSerif_400Regular',
+    fontSize: 13,
+    color: colors.textDim,
+  },
   sep: { height: 1, backgroundColor: colors.border, marginLeft: 52 },
   empty: { alignItems: 'center', paddingTop: 60 },
   emptyText: { fontFamily: 'Inter_400Regular', fontSize: 15, color: colors.textMuted },

@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, List, TrendingUp, BarChart2, Settings } from 'lucide-react-native';
+import { Home, List, TrendingUp, BarChart2, Settings, Sprout } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 import { colors } from '@/theme/colors';
 
@@ -30,6 +30,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="portfolio"
         options={{ tabBarIcon: ({ color }) => <TrendingUp size={24} color={color} /> }}
+      />
+      <Tabs.Screen
+        name="garden"
+        options={{ tabBarIcon: ({ color }) => <Sprout size={24} color={color} /> }}
       />
       <Tabs.Screen
         name="settings"

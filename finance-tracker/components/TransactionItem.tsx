@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Zap } from 'lucide-react-native';
+import { Zap, Clock } from 'lucide-react-native';
 import { colors } from '@/theme/colors';
 import { formatCurrency, formatTransactionDate, amountColor, amountPrefix } from '@/lib/utils';
 import type { Transaction } from '@/lib/types';
@@ -11,6 +11,18 @@ function isFastLog(tx: Transaction): boolean {
     new Date(tx.created_at).getTime() - new Date(tx.occurred_at).getTime()
   ) / 60_000;
   return diffMin <= 5;
+}
+
+function captureDelayText(tx: Transaction): string | null {
+  if (!tx.created_at) return null;
+  const diffMin = Math.abs(
+    new Date(tx.created_at).getTime() - new Date(tx.occurred_at).getTime()
+  ) / 60_000;
+  if (diffMin <= 5) return null;
+  if (diffMin < 60) return `logged ${Math.round(diffMin)}m later`;
+  const hours = Math.round(diffMin / 60);
+  if (hours < 24) return `logged ${hours}h later`;
+  return `logged ${Math.round(hours / 24)}d later`;
 }
 
 interface TransactionItemProps {
@@ -26,6 +38,7 @@ export function TransactionItem({ tx, category, wallet, toWallet, onPress }: Tra
   const prefix = amountPrefix(tx.type);
   const dotColor = category?.color ?? colors.border;
   const fastLog = isFastLog(tx);
+  const delayText = captureDelayText(tx);
 
   const label =
     tx.type === 'transfer'
@@ -47,6 +60,12 @@ export function TransactionItem({ tx, category, wallet, toWallet, onPress }: Tra
           {fastLog && <Zap size={10} color={colors.warning} fill={colors.warning} />}
           <Text style={styles.date}>{formatTransactionDate(tx.occurred_at)}</Text>
         </View>
+        {delayText && (
+          <View style={styles.delayRow}>
+            <Clock size={9} color={colors.textDim} />
+            <Text style={styles.delayText}>{delayText}</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -87,5 +106,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
     color: colors.textMuted,
+  },
+  delayRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 1 },
+  delayText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 10,
+    color: colors.textDim,
   },
 });

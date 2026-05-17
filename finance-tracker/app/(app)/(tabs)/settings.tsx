@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ChevronRight, Wallet, Tag, Target, Repeat,
-  TrendingUp, Download, Upload, Fingerprint, LogOut,
+  TrendingUp, Download, Upload, Fingerprint, LogOut, Trophy,
 } from 'lucide-react-native';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -77,7 +77,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { showOnHome, setShowOnHome } = usePortfolioStore();
   const { data: streak } = useStreak();
-  const { minimalMode, setMinimalMode } = usePrefsStore();
+  const { minimalMode, setMinimalMode, soundEnabled, setSoundEnabled } = usePrefsStore();
 
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
@@ -256,10 +256,44 @@ export default function SettingsScreen() {
           <ToggleRow
             icon={<Leaf size={18} color={colors.textMuted} />}
             label="Minimal mode"
-            sublabel="Hide creature and streak chip"
+            sublabel="Hide droplets, Sunday cards, quest nudges, and celebration animations"
             value={minimalMode}
             onValueChange={setMinimalMode}
           />
+          <View style={styles.divider} />
+          <SettingsRow
+            icon={<Trophy size={18} color={colors.textMuted} />}
+            label="Achievements"
+            sublabel="View your unlocked achievements"
+            onPress={() => router.push('/(app)/achievements')}
+          />
+          <View style={styles.divider} />
+          <ToggleRow
+            icon={<Leaf size={18} color={colors.textMuted} />}
+            label="Sound effects"
+            sublabel="Soft chimes on save, quest complete, harvest"
+            value={soundEnabled ?? false}
+            onValueChange={setSoundEnabled ?? (() => {})}
+          />
+        </View>
+      </View>
+
+      <View style={styles.group}>
+        <Text style={styles.groupLabel}>Tips</Text>
+        <View style={styles.card}>
+          {[
+            { title: 'Hold the + button', body: 'Opens a quick menu to mark a no-spend day.' },
+            { title: 'Log right away', body: 'Logging immediately after a purchase earns bonus XP and a speed badge.' },
+            { title: 'Harvest at Stage 5', body: 'Tap your plant when fully grown to save it to your garden.' },
+          ].map((tip, i, arr) => (
+            <View key={tip.title}>
+              <View style={styles.tipRow}>
+                <Text style={styles.tipTitle}>{tip.title}</Text>
+                <Text style={styles.tipBody}>{tip.body}</Text>
+              </View>
+              {i < arr.length - 1 && <View style={styles.divider} />}
+            </View>
+          ))}
         </View>
       </View>
 
@@ -315,4 +349,7 @@ const styles = StyleSheet.create({
   rowLabel: { fontFamily: 'Inter_400Regular', fontSize: 16, color: colors.text },
   rowSublabel: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textDim },
   divider: { height: 1, backgroundColor: colors.border, marginLeft: 52 },
+  tipRow: { paddingVertical: 14, paddingHorizontal: 16, gap: 4 },
+  tipTitle: { fontFamily: 'Inter_500Medium', fontSize: 14, color: colors.text },
+  tipBody: { fontFamily: 'Inter_400Regular', fontSize: 13, color: colors.textMuted, lineHeight: 18 },
 });

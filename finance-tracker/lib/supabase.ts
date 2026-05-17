@@ -3,27 +3,23 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { createClient } from '@supabase/supabase-js';
 
-// expo-secure-store only works on native; fall back to localStorage on web.
+// Three contexts:
+//   browser  → typeof localStorage !== 'undefined' → use localStorage
+//   native   → Platform.OS !== 'web'               → use SecureStore
+//   Node SSR → neither                              → no-op (Metro startup)
 const storage = {
-  getItem: (key: string): Promise<string | null> => {
-    if (Platform.OS === 'web') {
-      return Promise.resolve(localStorage.getItem(key));
-    }
-    return SecureStore.getItemAsync(key);
+  getItem: async (key: string): Promise<string | null> => {
+    if (typeof localStorage !== 'undefined') return localStorage.getItem(key);
+    if (Platform.OS !== 'web') return SecureStore.getItemAsync(key);
+    return null;
   },
-  setItem: (key: string, value: string): Promise<void> => {
-    if (Platform.OS === 'web') {
-      localStorage.setItem(key, value);
-      return Promise.resolve();
-    }
-    return SecureStore.setItemAsync(key, value);
+  setItem: async (key: string, value: string): Promise<void> => {
+    if (typeof localStorage !== 'undefined') { localStorage.setItem(key, value); return; }
+    if (Platform.OS !== 'web') { await SecureStore.setItemAsync(key, value); return; }
   },
-  removeItem: (key: string): Promise<void> => {
-    if (Platform.OS === 'web') {
-      localStorage.removeItem(key);
-      return Promise.resolve();
-    }
-    return SecureStore.deleteItemAsync(key);
+  removeItem: async (key: string): Promise<void> => {
+    if (typeof localStorage !== 'undefined') { localStorage.removeItem(key); return; }
+    if (Platform.OS !== 'web') { await SecureStore.deleteItemAsync(key); return; }
   },
 };
 

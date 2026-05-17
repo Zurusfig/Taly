@@ -1,8 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { format, startOfDay } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { startOfMonth, endOfMonth } from '@/lib/utils';
 import type { Transaction, MonthlyStats, TransactionType } from '@/lib/types';
 import { applyTransactionXp } from './useProgress';
+import { deleteNoSpendDayForDate } from './useNoSpendDays';
+import { markCaptureDoneToday } from './useDailyCompletions';
+import { checkAchievementsStandalone } from './useAchievements';
+import { queryClient } from '@/lib/queryClient';
+import type { StreakInfo } from './useStreak';
 
 export const TX_KEY = ['transactions'] as const;
 
@@ -91,7 +97,47 @@ export function useCreateTransaction() {
       };
       const { data, error } = await supabase.from('transactions').insert(payload).select().single();
       if (error) throw error;
+      // Fire-and-forget side effects
+      const occurredDate = format(startOfDay(new Date(payload.occurred_at)), 'yyyy-MM-dd');
       applyTransactionXp(payload.occurred_at).catch(() => {});
+      deleteNoSpendDayForDate(occurredDate, user.id).catch(() => {});
+      // Only mark capture petal if the transaction is for today
+      const isToday = occurredDate === format(startOfDay(new Date()), 'yyyy-MM-dd');
+      if (isToday) markCaptureDoneToday().catch(() => {});
+      // Achievement check: fetch total count and fast-log count
+      (async () => {
+        try {
+          const { count } = await supabase
+            .from('transactions')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id);
+          const txCount = count ?? 0;
+
+          const { data: timingRows } = await supabase
+            .from('transactions')
+            .select('created_at, occurred_at')
+            .eq('user_id', user.id);
+          const fastLogCount = (timingRows ?? []).filter((row) => {
+            const diff =
+              Math.abs(
+                new Date(row.created_at).getTime() - new Date(row.occurred_at).getTime(),
+              ) / 60000;
+            return diff <= 5;
+          }).length;
+
+          const ctx: Parameters<typeof checkAchievementsStandalone>[0] = {
+            txCount,
+            fastLogCount,
+          };
+          const streakData = queryClient.getQueryData<StreakInfo>(['streak']);
+          if (streakData) {
+            ctx.streakDays = streakData.current;
+          }
+          checkAchievementsStandalone(ctx).catch(() => {});
+        } catch {
+          // Ignore errors in fire-and-forget
+        }
+      })();
       return data as Transaction;
     },
     onSuccess: () => {
@@ -99,6 +145,8 @@ export function useCreateTransaction() {
       qc.invalidateQueries({ queryKey: ['wallets'] });
       qc.invalidateQueries({ queryKey: ['user_progress'] });
       qc.invalidateQueries({ queryKey: ['streak'] });
+      qc.invalidateQueries({ queryKey: ['no_spend_days'] });
+      qc.invalidateQueries({ queryKey: ['daily_completions'] });
     },
   });
 }

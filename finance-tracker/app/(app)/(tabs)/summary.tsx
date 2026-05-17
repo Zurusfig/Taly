@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { markAwarenessDoneToday } from '@/hooks/useDailyCompletions';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
@@ -58,6 +59,8 @@ export default function SummaryScreen() {
   const insets = useSafeAreaInsets();
   const [period, setPeriod] = useState<Period>('month');
   const { data: summary, isLoading } = useSummary(period);
+
+  useEffect(() => { markAwarenessDoneToday().catch(() => {}); }, []);
   const { data: budgets } = useBudgets();
 
   const top5 = summary?.categoryBreakdown.slice(0, 5) ?? [];
