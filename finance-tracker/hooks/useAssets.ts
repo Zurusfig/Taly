@@ -30,6 +30,8 @@ export function useAssets() {
   return useQuery<Asset[]>({
     queryKey: ['assets'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
       const { data, error } = await supabase
         .from('assets')
         .select('*')

@@ -5,6 +5,9 @@ import type { Wallet } from '@/lib/types';
 export const WALLETS_KEY = ['wallets'] as const;
 
 async function fetchWallets(): Promise<Wallet[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
   const [{ data: wallets, error: wErr }, { data: txs, error: tErr }] = await Promise.all([
     supabase.from('wallets').select('*').eq('archived', false).order('created_at'),
     supabase.from('transactions').select('wallet_id, to_wallet_id, type, amount'),

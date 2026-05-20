@@ -22,6 +22,9 @@ export interface TransactionFilters {
 }
 
 async function fetchTransactions(filters: TransactionFilters = {}): Promise<Transaction[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
   let q = supabase
     .from('transactions')
     .select('*')
