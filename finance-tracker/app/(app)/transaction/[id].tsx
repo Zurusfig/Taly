@@ -41,6 +41,7 @@ export default function TransactionDetail() {
 
   const [note, setNote] = useState(tx?.note ?? '');
   const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!tx) {
     return (
@@ -64,22 +65,14 @@ export default function TransactionDetail() {
     }
   }
 
-  async function handleDelete() {
-    Alert.alert('Delete transaction', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteTx.mutateAsync(tx!.id);
-            router.back();
-          } catch (e: any) {
-            Alert.alert('Error', e.message);
-          }
-        },
-      },
-    ]);
+  async function handleConfirmDelete() {
+    try {
+      await deleteTx.mutateAsync(tx!.id);
+      router.replace('/(app)/(tabs)/transactions');
+    } catch (e: any) {
+      setConfirmDelete(false);
+      Alert.alert('Error', e.message);
+    }
   }
 
   const aColor = amountColor(tx.type);
@@ -92,9 +85,12 @@ export default function TransactionDetail() {
           <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Transaction</Text>
-        <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
-          <Trash2 size={20} color={colors.danger} />
-        </TouchableOpacity>
+        {!confirmDelete && (
+          <TouchableOpacity onPress={() => setConfirmDelete(true)} style={styles.deleteBtn}>
+            <Trash2 size={20} color={colors.danger} />
+          </TouchableOpacity>
+        )}
+        {confirmDelete && <View style={{ width: 28 }} />}
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -150,6 +146,28 @@ export default function TransactionDetail() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Delete confirmation */}
+        {confirmDelete && (
+          <View style={styles.deleteConfirm}>
+            <Text style={styles.deleteConfirmText}>Delete this transaction?</Text>
+            <View style={styles.deleteConfirmRow}>
+              <Button
+                label="Cancel"
+                variant="ghost"
+                onPress={() => setConfirmDelete(false)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                label="Delete"
+                variant="danger"
+                onPress={handleConfirmDelete}
+                loading={deleteTx.isPending}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -223,4 +241,19 @@ const styles = StyleSheet.create({
   notePlaceholder: { fontFamily: 'Inter_400Regular', fontSize: 15, color: colors.textDim },
   noteEdit: { gap: 8 },
   noteActions: { flexDirection: 'row', gap: 8 },
+  deleteConfirm: {
+    backgroundColor: colors.bgElevated,
+    borderRadius: 14,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.danger,
+  },
+  deleteConfirmText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  deleteConfirmRow: { flexDirection: 'row', gap: 8 },
 });

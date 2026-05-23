@@ -24,6 +24,11 @@ const DEFAULT_CATEGORIES: Array<Pick<Category, 'name' | 'kind' | 'icon' | 'color
 export async function seedDefaultCategories() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
+  const { count } = await supabase
+    .from('categories')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id);
+  if ((count ?? 0) > 0) return;
   const rows = DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: user.id }));
   const { error } = await supabase.from('categories').insert(rows);
   if (error) throw error;
@@ -39,7 +44,14 @@ export function useCategories(kind?: CategoryKind) {
       if (kind) q = q.eq('kind', kind);
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as Category[];
+      // Deduplicate by name+kind in case seedDefaultCategories ran more than once
+      const seen = new Set<string>();
+      return (data ?? []).filter((c) => {
+        const key = `${c.kind}:${c.name}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }) as Category[];
     },
   });
 }
