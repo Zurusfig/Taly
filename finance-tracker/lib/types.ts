@@ -12,6 +12,7 @@ export interface Wallet {
   icon: string | null;
   color: string | null;
   archived: boolean;
+  is_usable: boolean;
   created_at: string;
   // computed client-side
   balance: number;

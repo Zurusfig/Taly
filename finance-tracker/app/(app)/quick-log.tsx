@@ -1,7 +1,7 @@
-import { useState, useCallback, Fragment } from 'react';
+import { useState, useCallback, Fragment, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, Modal, FlatList, LogBox, Pressable,
+  Alert, Modal, FlatList, LogBox, Pressable, ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -14,7 +14,8 @@ import Animated, {
   withSequence,
   Easing,
 } from 'react-native-reanimated';
-import { X, Check } from 'lucide-react-native';
+import { X, Check, ChevronUp, ChevronDown } from 'lucide-react-native';
+import { format, startOfDay, differenceInCalendarDays, isToday, isYesterday } from 'date-fns';
 import { colors } from '@/theme/colors';
 import { currencySymbol, formatAmount } from '@/lib/utils';
 import { NumPad, useNumPadAmount } from '@/components/ui/NumPad';
@@ -32,6 +33,116 @@ const TYPE_COLORS: Record<TransactionType, string> = {
   income: colors.accent,
   transfer: colors.warning,
 };
+
+// ─── Date Picker Modal ────────────────────────────────────────────────────────
+
+const DATE_CHIPS = Array.from({ length: 30 }, (_, i) => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - i);
+  return d;
+});
+
+function chipLabel(d: Date): string {
+  if (isToday(d)) return 'Today';
+  if (isYesterday(d)) return 'Yesterday';
+  return format(d, 'EEE MMM d');
+}
+
+function DatePickerModal({
+  visible, value, onChange, onClose,
+}: {
+  visible: boolean;
+  value: Date;
+  onChange: (d: Date) => void;
+  onClose: () => void;
+}) {
+  const [selectedDay, setSelectedDay] = useState<Date>(() => startOfDay(value));
+  const [hour, setHour] = useState(value.getHours());
+  const [minute, setMinute] = useState(value.getMinutes());
+  const chipRef = useRef<ScrollView>(null);
+
+  // When modal opens, sync internal state
+  const [prevVisible, setPrevVisible] = useState(visible);
+  if (visible !== prevVisible) {
+    setPrevVisible(visible);
+    if (visible) {
+      setSelectedDay(startOfDay(value));
+      setHour(value.getHours());
+      setMinute(value.getMinutes());
+    }
+  }
+
+  function confirm() {
+    const result = new Date(selectedDay);
+    result.setHours(hour, minute, 0, 0);
+    onChange(result);
+    onClose();
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} />
+      <View style={styles.pickerSheet}>
+        <View style={styles.pickerHeader}>
+          <Text style={styles.pickerTitle}>Select date & time</Text>
+          <TouchableOpacity onPress={onClose}><X size={20} color={colors.textMuted} /></TouchableOpacity>
+        </View>
+
+        {/* Day chips */}
+        <ScrollView
+          ref={chipRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          {DATE_CHIPS.map((d, i) => {
+            const selected = differenceInCalendarDays(selectedDay, d) === 0;
+            return (
+              <TouchableOpacity
+                key={i}
+                onPress={() => setSelectedDay(d)}
+                style={[styles.dayChip, selected && styles.dayChipActive]}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.dayChipText, selected && styles.dayChipTextActive]}>
+                  {chipLabel(d)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* Time picker */}
+        <View style={styles.timePicker}>
+          <View style={styles.timeUnit}>
+            <TouchableOpacity onPress={() => setHour((h) => (h + 1) % 24)} hitSlop={8}>
+              <ChevronUp size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            <Text style={styles.timeValue}>{String(hour).padStart(2, '0')}</Text>
+            <TouchableOpacity onPress={() => setHour((h) => (h + 23) % 24)} hitSlop={8}>
+              <ChevronDown size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.timeSep}>:</Text>
+          <View style={styles.timeUnit}>
+            <TouchableOpacity onPress={() => setMinute((m) => (m + 1) % 60)} hitSlop={8}>
+              <ChevronUp size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            <Text style={styles.timeValue}>{String(minute).padStart(2, '0')}</Text>
+            <TouchableOpacity onPress={() => setMinute((m) => (m + 59) % 60)} hitSlop={8}>
+              <ChevronDown size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.confirmBtn} onPress={confirm} activeOpacity={0.8}>
+          <Text style={styles.confirmBtnText}>Confirm</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+}
 
 // ─── Picker Modal ─────────────────────────────────────────────────────────────
 
@@ -211,9 +322,11 @@ export default function QuickLog() {
 
   const [amountStr, setAmountStr] = useState('0');
   const [note, setNote] = useState('');
+  const [date, setDate] = useState<Date>(() => new Date());
   const [showWalletPicker, setShowWalletPicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showToWalletPicker, setShowToWalletPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleKey = useNumPadAmount();
 
@@ -225,6 +338,8 @@ export default function QuickLog() {
   const symbol = currencySymbol(currency);
   const amount = parseFloat(amountStr) || 0;
   const typeColor = TYPE_COLORS[type];
+
+  const datePillLabel = isToday(date) ? 'Now' : isYesterday(date) ? 'Yesterday' : format(date, 'MMM d, HH:mm');
 
   const effectiveWalletId = activeWallet?.id ?? null;
   const effectiveCategoryId = type !== 'transfer' ? (activeCategory?.id ?? null) : null;
@@ -241,6 +356,7 @@ export default function QuickLog() {
       type,
       amount,
       note: note.trim() || null,
+      occurred_at: date.toISOString(),
     });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     // Brief delay so checkmark animation plays before dismissing
@@ -282,6 +398,11 @@ export default function QuickLog() {
             dotColor={activeCategory?.color ?? null}
           />
         )}
+        <PillButton
+          label={datePillLabel}
+          onPress={() => setShowDatePicker(true)}
+          active={!isToday(date)}
+        />
       </View>
 
       <TextInput
@@ -327,6 +448,12 @@ export default function QuickLog() {
         selectedId={effectiveToWalletId}
         onSelect={(id) => { setToWalletId(id); }}
         onClose={() => setShowToWalletPicker(false)}
+      />
+      <DatePickerModal
+        visible={showDatePicker}
+        value={date}
+        onChange={setDate}
+        onClose={() => setShowDatePicker(false)}
       />
     </View>
   );
@@ -412,4 +539,55 @@ const styles = StyleSheet.create({
   pickerDot: { width: 10, height: 10, borderRadius: 5 },
   pickerLabel: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 16, color: colors.text },
   pickerCheck: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
+
+  // Date picker
+  chipRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexDirection: 'row' },
+  dayChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 100,
+    backgroundColor: colors.bgInput,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  dayChipActive: { borderColor: colors.accent, backgroundColor: colors.accentMuted },
+  dayChipText: { fontFamily: 'Inter_400Regular', fontSize: 13, color: colors.textMuted },
+  dayChipTextActive: { color: colors.text, fontFamily: 'Inter_600SemiBold' },
+  timePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  timeUnit: { alignItems: 'center', gap: 8 },
+  timeValue: {
+    fontFamily: 'InstrumentSerif_400Regular',
+    fontSize: 36,
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
+    minWidth: 54,
+    textAlign: 'center',
+  },
+  timeSep: {
+    fontFamily: 'InstrumentSerif_400Regular',
+    fontSize: 36,
+    color: colors.textMuted,
+    paddingBottom: 8,
+  },
+  confirmBtn: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  confirmBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 16,
+    color: colors.bg,
+  },
 });
