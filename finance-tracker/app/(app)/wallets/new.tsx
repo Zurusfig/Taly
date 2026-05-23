@@ -4,6 +4,7 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  Switch,
   StyleSheet,
   Alert,
 } from 'react-native';
@@ -29,6 +30,7 @@ export default function NewWallet() {
   const [balance, setBalance] = useState('0');
   const [currency, setCurrency] = useState('THB');
   const [color, setColor] = useState(COLORS[0]);
+  const [isUsable, setIsUsable] = useState(true);
 
   async function handleSave() {
     if (!name.trim()) return;
@@ -40,6 +42,7 @@ export default function NewWallet() {
         currency,
         icon: null,
         color,
+        is_usable: isUsable,
       });
       router.back();
     } catch (e: any) {
@@ -106,6 +109,19 @@ export default function NewWallet() {
           </View>
         </View>
 
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleInfo}>
+            <Text style={styles.toggleLabel}>Count toward usable balance</Text>
+            <Text style={styles.toggleSub}>Uncheck for savings or investment wallets</Text>
+          </View>
+          <Switch
+            value={isUsable}
+            onValueChange={setIsUsable}
+            trackColor={{ false: colors.border, true: colors.accentMuted }}
+            thumbColor={isUsable ? colors.accent : colors.textDim}
+          />
+        </View>
+
         <Button
           label="Create wallet"
           onPress={handleSave}
@@ -135,4 +151,15 @@ const styles = StyleSheet.create({
   colorSwatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
   colorSwatchActive: { borderColor: colors.text },
   saveBtn: { marginTop: 8 },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgElevated,
+    borderRadius: 12,
+    padding: 14,
+    gap: 12,
+  },
+  toggleInfo: { flex: 1, gap: 2 },
+  toggleLabel: { fontFamily: 'Inter_500Medium', fontSize: 14, color: colors.text },
+  toggleSub: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textMuted },
 });

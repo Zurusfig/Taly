@@ -33,6 +33,8 @@ export function useCategories(kind?: CategoryKind) {
   return useQuery({
     queryKey: [...CATEGORIES_KEY, kind],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
       let q = supabase.from('categories').select('*').eq('archived', false).order('name');
       if (kind) q = q.eq('kind', kind);
       const { data, error } = await q;

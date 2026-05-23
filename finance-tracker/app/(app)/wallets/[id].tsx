@@ -4,6 +4,7 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  Switch,
   StyleSheet,
   Alert,
 } from 'react-native';
@@ -33,6 +34,7 @@ export default function EditWallet() {
   const [type, setType] = useState<WalletType>(wallet?.type ?? 'bank');
   const [currency, setCurrency] = useState(wallet?.currency ?? 'THB');
   const [color, setColor] = useState(wallet?.color ?? COLORS[0]);
+  const [isUsable, setIsUsable] = useState(wallet?.is_usable ?? true);
 
   useEffect(() => {
     if (wallet) {
@@ -40,6 +42,7 @@ export default function EditWallet() {
       setType(wallet.type);
       setCurrency(wallet.currency);
       setColor(wallet.color ?? COLORS[0]);
+      setIsUsable(wallet.is_usable ?? true);
     }
   }, [wallet?.id]);
 
@@ -56,7 +59,7 @@ export default function EditWallet() {
   async function handleSave() {
     if (!name.trim()) return;
     try {
-      await updateWallet.mutateAsync({ id: wallet!.id, name: name.trim(), type, currency, color });
+      await updateWallet.mutateAsync({ id: wallet!.id, name: name.trim(), type, currency, color, is_usable: isUsable });
       router.back();
     } catch (e: any) {
       Alert.alert('Error', e.message);
@@ -132,6 +135,19 @@ export default function EditWallet() {
           </View>
         </View>
 
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleInfo}>
+            <Text style={styles.toggleLabel}>Count toward usable balance</Text>
+            <Text style={styles.toggleSub}>Uncheck for savings or investment wallets</Text>
+          </View>
+          <Switch
+            value={isUsable}
+            onValueChange={setIsUsable}
+            trackColor={{ false: colors.border, true: colors.accentMuted }}
+            thumbColor={isUsable ? colors.accent : colors.textDim}
+          />
+        </View>
+
         <Button label="Save changes" onPress={handleSave} loading={updateWallet.isPending} disabled={!name.trim()} />
         <Button label="Archive wallet" variant="danger" onPress={handleArchive} loading={archiveWallet.isPending} />
       </ScrollView>
@@ -155,4 +171,15 @@ const styles = StyleSheet.create({
   colorRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   colorSwatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
   colorSwatchActive: { borderColor: colors.text },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgElevated,
+    borderRadius: 12,
+    padding: 14,
+    gap: 12,
+  },
+  toggleInfo: { flex: 1, gap: 2 },
+  toggleLabel: { fontFamily: 'Inter_500Medium', fontSize: 14, color: colors.text },
+  toggleSub: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textMuted },
 });

@@ -158,7 +158,7 @@ export default function HomeScreen() {
   const { data: recentSnapshots } = usePortfolioSnapshots('1W');
   const { data: streak } = useStreak();
   const { data: progress } = useProgress();
-  const { minimalMode } = usePrefsStore();
+  const { minimalMode, showUsableOnly, setShowUsableOnly } = usePrefsStore();
   const hasCashWallet = (wallets ?? []).some((w) => w.type === 'cash');
   const { data: todayCompletion } = useTodayCompletion();
   const { data: todayNoSpend } = useTodayNoSpendDay();
@@ -217,6 +217,9 @@ export default function HomeScreen() {
   const hasWallets = (wallets?.length ?? 0) > 0;
 
   const totalBalance = wallets?.reduce((s, w) => s + w.balance, 0) ?? 0;
+  const usableBalance = wallets?.filter((w) => w.is_usable ?? true).reduce((s, w) => s + w.balance, 0) ?? 0;
+  const displayBalance = showUsableOnly ? usableBalance : totalBalance;
+  const hasSavingsWallets = (wallets ?? []).some((w) => !(w.is_usable ?? true));
 
   const portfolioValueUsd = (assets ?? []).reduce((s, a) => {
     return s + a.quantity * (a.last_price ?? a.avg_cost_per_unit ?? 0);
@@ -293,8 +296,19 @@ export default function HomeScreen() {
             )}
           </View>
           <Text style={styles.totalBalance}>
-            ฿{formatAmount(totalBalance)}
+            ฿{formatAmount(displayBalance)}
           </Text>
+          {hasSavingsWallets && (
+            <TouchableOpacity
+              onPress={() => setShowUsableOnly(!showUsableOnly)}
+              style={styles.usableToggle}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.usableToggleText, showUsableOnly && styles.usableToggleActive]}>
+                {showUsableOnly ? 'Usable' : 'Total'}
+              </Text>
+            </TouchableOpacity>
+          )}
           {/* Monthly stats row */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -362,6 +376,7 @@ export default function HomeScreen() {
             <WalletCard
               wallet={item}
               onPress={() => router.push(`/(app)/wallets/${item.id}`)}
+              dimmed={showUsableOnly && !(item.is_usable ?? true)}
             />
           )}
           ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
@@ -652,6 +667,24 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontVariant: ['tabular-nums'],
   },
+  usableToggle: {
+    alignSelf: 'flex-start',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: 2,
+  },
+  usableToggleText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    color: colors.textDim,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  usableToggleActive: { color: colors.accent },
   statsRow: {
     flexDirection: 'row',
     marginTop: 8,

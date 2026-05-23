@@ -39,7 +39,14 @@ export default function WalletsScreen() {
             >
               <View style={[styles.colorDot, { backgroundColor: item.color ?? colors.accent }]} />
               <View style={styles.mid}>
-                <Text style={styles.name}>{item.name}</Text>
+                <View style={styles.nameRow}>
+                  <Text style={styles.name}>{item.name}</Text>
+                  {!(item.is_usable ?? true) && (
+                    <View style={styles.savingsBadge}>
+                      <Text style={styles.savingsLabel}>Savings</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={styles.type}>{item.type}</Text>
               </View>
               <Text style={styles.balance}>
@@ -86,7 +93,10 @@ const styles = StyleSheet.create({
   },
   colorDot: { width: 12, height: 12, borderRadius: 6 },
   mid: { flex: 1, gap: 2 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontFamily: 'Inter_500Medium', fontSize: 16, color: colors.text },
+  savingsBadge: { backgroundColor: colors.bgInput, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  savingsLabel: { fontFamily: 'Inter_400Regular', fontSize: 10, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 0.4 },
   type: { fontFamily: 'Inter_400Regular', fontSize: 12, color: colors.textDim, textTransform: 'capitalize' },
   balance: {
     fontFamily: 'InstrumentSerif_400Regular',

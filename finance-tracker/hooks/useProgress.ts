@@ -96,14 +96,19 @@ export async function applyTransactionXp(occurredAt: string) {
   // Upsert: if row exists increment xp and update last_logged_date
   const { data: existing } = await supabase
     .from('user_progress')
-    .select('id, xp')
+    .select('id, xp, last_logged_date')
     .eq('user_id', user.id)
     .single();
 
   if (existing) {
+    const logDate = format(startOfDay(new Date(occurredAt)), 'yyyy-MM-dd');
+    const newLastLoggedDate =
+      !existing.last_logged_date || logDate > existing.last_logged_date
+        ? logDate
+        : existing.last_logged_date;
     await supabase
       .from('user_progress')
-      .update({ xp: existing.xp + xpGain, last_logged_date: today, updated_at: new Date().toISOString() })
+      .update({ xp: existing.xp + xpGain, last_logged_date: newLastLoggedDate, updated_at: new Date().toISOString() })
       .eq('user_id', user.id);
   } else {
     await supabase

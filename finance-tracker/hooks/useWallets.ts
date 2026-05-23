@@ -5,6 +5,9 @@ import type { Wallet } from '@/lib/types';
 export const WALLETS_KEY = ['wallets'] as const;
 
 async function fetchWallets(): Promise<Wallet[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
   const [{ data: wallets, error: wErr }, { data: txs, error: tErr }] = await Promise.all([
     supabase.from('wallets').select('*').eq('archived', false).order('created_at'),
     supabase.from('transactions').select('wallet_id, to_wallet_id, type, amount'),
@@ -28,7 +31,7 @@ export function useWallets() {
   return useQuery({ queryKey: WALLETS_KEY, queryFn: fetchWallets, retry: 3, retryDelay: 1000 });
 }
 
-type WalletInput = Pick<Wallet, 'name' | 'type' | 'initial_balance' | 'currency' | 'icon' | 'color'>;
+type WalletInput = Pick<Wallet, 'name' | 'type' | 'initial_balance' | 'currency' | 'icon' | 'color'> & { is_usable?: boolean };
 
 export function useCreateWallet() {
   const qc = useQueryClient();
